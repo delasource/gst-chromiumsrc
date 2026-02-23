@@ -31,16 +31,24 @@ static GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE(
 #define gst_chromium_src_parent_class parent_class
 G_DEFINE_TYPE(GstChromiumSrc, gst_chromium_src, GST_TYPE_BIN);
 
-static void gst_chromium_src_set_property(GObject *object, guint prop_id,
-    const GValue *value, GParamSpec *pspec);
-static void gst_chromium_src_get_property(GObject *object, guint prop_id,
+static void gst_chromium_src_set_property(
+	GObject *object,
+	guint prop_id,
+    const GValue *value,
+	GParamSpec *pspec);
+static void gst_chromium_src_get_property(
+	GObject *object,
+	guint prop_id,
     GValue *value, GParamSpec *pspec);
 static void gst_chromium_src_finalize(GObject *object);
 
 static GstStateChangeReturn gst_chromium_src_change_state(
-    GstElement *element, GstStateChange transition);
+    GstElement *element,
+	GstStateChange transition);
 
-static void gst_chromium_src_need_data(GstAppSrc *appsrc, guint length,
+static void gst_chromium_src_need_data(
+	GstAppSrc *appsrc,
+	guint length,
     gpointer user_data);
 static void gst_chromium_src_enough_data(GstAppSrc *appsrc, gpointer user_data);
 
@@ -67,7 +75,7 @@ static void gst_chromium_src_class_init(GstChromiumSrcClass *klass) {
     g_object_class_install_property(gobject_class, PROP_URL,
         g_param_spec_string("url", "URL",
             "URL to render in the browser",
-            "https://pingup.de/w/png-test.html",
+            "https://example.com/test.html",
             G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
     g_object_class_install_property(gobject_class, PROP_WIDTH,
@@ -84,8 +92,8 @@ static void gst_chromium_src_class_init(GstChromiumSrcClass *klass) {
 
     g_object_class_install_property(gobject_class, PROP_FRAMERATE,
         g_param_spec_string("framerate", "Framerate",
-            "Output framerate (e.g., 1/1 for 1 fps)",
-            "1/1",
+            "Output framerate in frames per second (e.g., 30)",
+            "30",
             G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
     gst_element_class_set_metadata(gstelement_class,
@@ -112,11 +120,10 @@ static void gst_chromium_src_class_init(GstChromiumSrcClass *klass) {
  * is created (e.g., via gst_element_factory_make).
  */
 static void gst_chromium_src_init(GstChromiumSrc *src) {
-    src->url = g_strdup("https://pingup.de/w/png-test.html");
+    src->url = g_strdup("https://example.com/test.html");
     src->width = 1920;
     src->height = 1080;
-    src->fps_num = 1;
-    src->fps_denom = 1;
+    src->fps_num = 30;
 
     src->appsrc = GST_APP_SRC(gst_element_factory_make("appsrc", "internal_appsrc"));
     if (!src->appsrc) {
@@ -127,7 +134,8 @@ static void gst_chromium_src_init(GstChromiumSrc *src) {
     gst_bin_add(GST_BIN(src), GST_ELEMENT(src->appsrc));
 
     src->ghostpad = gst_ghost_pad_new("src",
-        gst_element_get_static_pad(GST_ELEMENT(src->appsrc), "src"));
+        gst_element_get_static_pad(GST_ELEMENT(src->appsrc),
+		"src"));
     gst_element_add_pad(GST_ELEMENT(src), src->ghostpad);
 
     g_object_set(src->appsrc, "stream-type", GST_APP_STREAM_TYPE_STREAM, NULL);
@@ -136,10 +144,8 @@ static void gst_chromium_src_init(GstChromiumSrc *src) {
     g_object_set(src->appsrc, "emit-signals", TRUE, NULL);
     g_object_set(src->appsrc, "max-bytes", (guint64)(1920 * 1080 * 4 * 3), NULL);
 
-    g_signal_connect(src->appsrc, "need-data",
-        G_CALLBACK(gst_chromium_src_need_data), src);
-    g_signal_connect(src->appsrc, "enough-data",
-        G_CALLBACK(gst_chromium_src_enough_data), src);
+    g_signal_connect(src->appsrc, "need-data", G_CALLBACK(gst_chromium_src_need_data), src);
+    g_signal_connect(src->appsrc, "enough-data", G_CALLBACK(gst_chromium_src_enough_data), src);
 
     src->frame_buffer = NULL;
     src->frame_size = 0;
@@ -163,12 +169,15 @@ static void gst_chromium_src_init(GstChromiumSrc *src) {
  * @pspec: The property specification
  *
  * Handles setting of GObject properties (url, width, height, framerate).
- * Parses framerate string in "num/denom" format.
+ * Framerate is parsed as integer frames per second.
  *
  * Invoked by GObject when application code calls g_object_set() on the element.
  */
-static void gst_chromium_src_set_property(GObject *object, guint prop_id,
-    const GValue *value, GParamSpec *pspec) {
+static void gst_chromium_src_set_property(
+		GObject *object,
+		guint prop_id,
+    	const GValue *value,
+    	GParamSpec *pspec) {
     GstChromiumSrc *src = GST_CHROMIUM_SRC(object);
 
     switch (prop_id) {
@@ -185,10 +194,7 @@ static void gst_chromium_src_set_property(GObject *object, guint prop_id,
         case PROP_FRAMERATE: {
             const gchar *fps_str = g_value_get_string(value);
             if (fps_str) {
-                if (sscanf(fps_str, "%d/%d", &src->fps_num, &src->fps_denom) != 2) {
-                    src->fps_num = atoi(fps_str);
-                    src->fps_denom = 1;
-                }
+                src->fps_num = atoi(fps_str);
             }
             break;
         }
@@ -205,12 +211,14 @@ static void gst_chromium_src_set_property(GObject *object, guint prop_id,
  * @value: The value to fill
  * @pspec: The property specification
  *
- * Handles retrieval of GObject properties. Formats framerate as "num/denom".
+ * Handles retrieval of GObject properties. Returns framerate as integer fps.
  *
  * Invoked by GObject when application code calls g_object_get() on the element.
  */
-static void gst_chromium_src_get_property(GObject *object, guint prop_id,
-    GValue *value, GParamSpec *pspec) {
+static void gst_chromium_src_get_property(GObject *object,
+		guint prop_id,
+	    GValue *value,
+		GParamSpec *pspec) {
     GstChromiumSrc *src = GST_CHROMIUM_SRC(object);
 
     switch (prop_id) {
@@ -224,7 +232,7 @@ static void gst_chromium_src_get_property(GObject *object, guint prop_id,
             g_value_set_int(value, src->height);
             break;
         case PROP_FRAMERATE: {
-            gchar *fps_str = g_strdup_printf("%d/%d", src->fps_num, src->fps_denom);
+            gchar *fps_str = g_strdup_printf("%d", src->fps_num);
             g_value_take_string(value, fps_str);
             break;
         }
@@ -313,7 +321,7 @@ static void gst_chromium_src_need_data(GstAppSrc *appsrc, guint length,
     src->frame_ready = FALSE;
     g_mutex_unlock(&src->frame_mutex);
 
-    duration = gst_util_uint64_scale(GST_SECOND, src->fps_denom, src->fps_num);
+    duration = gst_util_uint64_scale(GST_SECOND, 1, src->fps_num);
     timestamp = src->frame_count * duration;
 
     GST_BUFFER_PTS(buffer) = timestamp;
@@ -322,8 +330,10 @@ static void gst_chromium_src_need_data(GstAppSrc *appsrc, guint length,
 
     src->frame_count++;
 
-    GST_DEBUG_OBJECT(src, "Pushing buffer: ts=%" GST_TIME_FORMAT " dur=%" GST_TIME_FORMAT,
-        GST_TIME_ARGS(timestamp), GST_TIME_ARGS(duration));
+    GST_DEBUG_OBJECT(src,
+		"Pushing buffer: ts=%" GST_TIME_FORMAT " dur=%" GST_TIME_FORMAT,
+        GST_TIME_ARGS(timestamp),
+        GST_TIME_ARGS(duration));
 
     ret = gst_app_src_push_buffer(src->appsrc, buffer);
     if (ret != GST_FLOW_OK) {
@@ -383,7 +393,7 @@ static gboolean gst_chromium_src_start(GstChromiumSrc *src) {
         "format", G_TYPE_STRING, "BGRA",
         "width", G_TYPE_INT, src->width,
         "height", G_TYPE_INT, src->height,
-        "framerate", GST_TYPE_FRACTION, src->fps_num, src->fps_denom,
+        "framerate", GST_TYPE_FRACTION, src->fps_num, 1,
         NULL);
 
     GST_INFO_OBJECT(src, "Setting caps: %" GST_PTR_FORMAT, caps);
@@ -393,9 +403,13 @@ static gboolean gst_chromium_src_start(GstChromiumSrc *src) {
     src->running = TRUE;
     src->frame_count = 0;
 
+	// Start the chromium (see other file)
     if (!cef_browser_start(src, src->url, src->width, src->height)) {
-        GST_ELEMENT_ERROR(src, RESOURCE, FAILED,
-            ("Failed to start CEF browser"), (NULL));
+        GST_ELEMENT_ERROR(src,
+			RESOURCE,
+			FAILED,
+            ("Failed to start CEF browser"),
+            (NULL));
         src->running = FALSE;
         g_free(src->frame_buffer);
         src->frame_buffer = NULL;

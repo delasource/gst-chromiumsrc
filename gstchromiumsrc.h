@@ -20,25 +20,23 @@ typedef struct _GstChromiumSrc GstChromiumSrc;
 typedef struct _GstChromiumSrcClass GstChromiumSrcClass;
 
 struct _GstChromiumSrc {
-    GstBin parent;
-
+    GstBin    parent;
     GstAppSrc *appsrc;
-    GstPad *ghostpad;
+    GstPad    *ghostpad;
 
     gchar *url;
-    gint width;
-    gint height;
-    gint fps_num;
-    gint fps_denom;
+    gint  width;
+    gint  height;
+    gint  fps_num;
 
     gpointer cef_browser;
     gpointer cef_client;
     gpointer cef_thread;
 
-    guint8 *frame_buffer;
-    gsize frame_size;
-    GMutex frame_mutex;
-    GCond frame_cond;
+    guint8   *frame_buffer;
+    gsize    frame_size;
+    GMutex   frame_mutex;
+    GCond    frame_cond;
     gboolean frame_ready;
     gboolean running;
     gboolean page_loaded;

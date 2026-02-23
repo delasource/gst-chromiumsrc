@@ -369,8 +369,13 @@ gboolean cef_browser_start(GstChromiumSrc *src, const gchar *url, gint width, gi
     src->cef_client = static_cast<gpointer>(client.get());
     client->AddRef();
 
-    if (!CefBrowserHost::CreateBrowser(window_info, client, cef_url,
-            browser_settings, nullptr, nullptr)) {
+    if (!CefBrowserHost::CreateBrowser(
+			window_info,
+			client,
+			cef_url,
+            browser_settings,
+			nullptr,
+			nullptr)) {
         g_warning("Failed to create CEF browser");
         return FALSE;
     }
