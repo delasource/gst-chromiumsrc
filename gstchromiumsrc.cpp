@@ -336,7 +336,8 @@ static gboolean gst_chromium_src_stop(GstChromiumSrc *src) {
 }
 
 static GstStateChangeReturn gst_chromium_src_change_state(
-    GstElement *element, GstStateChange transition) {
+		GstElement *element,
+		GstStateChange transition) {
     GstChromiumSrc *src = GST_CHROMIUM_SRC(element);
     GstStateChangeReturn ret;
 
@@ -380,10 +381,10 @@ GST_PLUGIN_DEFINE(
     GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     chromiumsrc,
-    "CEF/Chromium browser as video source",
+    "Chromium browser (CEF) as video source",
     plugin_init,
     "1.0.0",
     "LGPL",
     "chromiumsrc",
-    "https://github.com/opencode/chromiumsrc"
+    "https://github.com/delasource/chromiumsrc"
 )
