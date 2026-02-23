@@ -307,9 +307,9 @@ static gboolean initialize_cef(void) {
 
     CefRefPtr<CefCommandLine> command_line = CefCommandLine::CreateCommandLine();
     //command_line->AppendSwitch("single-process");
-    command_line->AppendSwitch("disable-gpu");
-    command_line->AppendSwitch("disable-gpu-compositing");
-    command_line->AppendSwitch("disable-software-rasterizer");
+    //command_line->AppendSwitch("disable-gpu");
+    //command_line->AppendSwitch("disable-gpu-compositing");
+    //command_line->AppendSwitch("disable-software-rasterizer");
     command_line->AppendSwitch("disable-extensions");
     command_line->AppendSwitch("disable-sync");
     command_line->AppendSwitch("disable-background-networking");
@@ -390,8 +390,8 @@ gboolean cef_browser_start(GstChromiumSrc *src, const gchar *url, gint width, gi
         return FALSE;
     }
 
-    src->cef_thread = g_thread_new("cef-message-loop",
-        cef_message_loop_thread, src);
+    // This line seems to not do anything?
+    src->cef_thread = g_thread_new("cef-message-loop", cef_message_loop_thread, src);
 
     if (!src->cef_thread) {
         g_warning("Failed to create CEF message loop thread");

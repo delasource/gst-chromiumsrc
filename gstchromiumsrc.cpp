@@ -194,7 +194,10 @@ static void gst_chromium_src_set_property(
         case PROP_FRAMERATE: {
             const gchar *fps_str = g_value_get_string(value);
             if (fps_str) {
-                src->fps_num = atoi(fps_str);
+                gint fps = atoi(fps_str);
+                if (fps < 1) fps = 1;
+                if (fps > 60) fps = 60;
+                src->fps_num = fps;
             }
             break;
         }
