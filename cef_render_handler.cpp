@@ -299,11 +299,21 @@ static gboolean initialize_cef(void) {
     settings.log_severity = LOGSEVERITY_WARNING;
     settings.multi_threaded_message_loop = FALSE;
 
+    gchar *cache_dir = g_strdup_printf("/tmp/chromiumsrc-%d", getpid());
+    g_mkdir_with_parents(cache_dir, 0700);
+    CefString(&settings.root_cache_path) = cache_dir;
+    CefString(&settings.cache_path) = cache_dir;
+    g_free(cache_dir);
+
     CefRefPtr<CefCommandLine> command_line = CefCommandLine::CreateCommandLine();
-    command_line->AppendSwitch("single-process");
+    //command_line->AppendSwitch("single-process");
     command_line->AppendSwitch("disable-gpu");
     command_line->AppendSwitch("disable-gpu-compositing");
     command_line->AppendSwitch("disable-software-rasterizer");
+    command_line->AppendSwitch("disable-extensions");
+    command_line->AppendSwitch("disable-sync");
+    command_line->AppendSwitch("disable-background-networking");
+    command_line->AppendSwitch("no-first-run");
     command_line->AppendSwitchWithValue("log-severity", "warning");
 
     CefRefPtr<CefApp> app;
