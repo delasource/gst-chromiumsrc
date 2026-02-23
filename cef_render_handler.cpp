@@ -149,15 +149,50 @@ private:
 };
 
 /**
+ * CefLifeSpanHandlerImpl - Handles browser lifecycle events
+ *
+ * Receives callbacks when a browser is created or closed.
+ */
+class CefLifeSpanHandlerImpl : public CefLifeSpanHandler {
+public:
+    CefLifeSpanHandlerImpl(GstChromiumSrc *src) : src_(src) {}
+
+    /**
+     * OnAfterCreated:
+     * @browser: The newly created CEF browser instance
+     *
+     * Stores the browser reference after it's created. This is the
+     * callback for the asynchronous CreateBrowser call.
+     *
+     * Invoked by CEF after the browser has been created successfully.
+     */
+    void OnAfterCreated(CefRefPtr<CefBrowser> browser) override {
+        CEF_REQUIRE_UI_THREAD();
+        if (src_) {
+            src_->cef_browser = static_cast<gpointer>(browser.get());
+            browser->AddRef();
+        }
+    }
+
+private:
+    GstChromiumSrc *src_;
+    IMPLEMENT_REFCOUNTING(CefLifeSpanHandlerImpl);
+};
+
+/**
  * CefClientImpl - Main CEF client interface implementation
  *
- * Provides access to the render and load handlers. This is the main
+ * Provides access to the render, load, and lifespan handlers. This is the main
  * interface CEF uses to communicate with the application.
  */
 class CefClientImpl : public CefClient {
 public:
-    CefClientImpl(CefRefPtr<CefRenderHandler> render_handler, CefRefPtr<CefLoadHandler> load_handler)
-        : render_handler_(render_handler), load_handler_(load_handler) {}
+    CefClientImpl(CefRefPtr<CefRenderHandler> render_handler,
+                  CefRefPtr<CefLoadHandler> load_handler,
+                  CefRefPtr<CefLifeSpanHandler> lifespan_handler)
+        : render_handler_(render_handler),
+          load_handler_(load_handler),
+          lifespan_handler_(lifespan_handler) {}
 
     /**
      * GetRenderHandler:
@@ -182,9 +217,21 @@ public:
         return load_handler_;
     }
 
+    /**
+     * GetLifeSpanHandler:
+     *
+     * Returns the lifespan handler for browser creation callbacks.
+     *
+     * Invoked by CEF during browser creation and destruction.
+     */
+    CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override {
+        return lifespan_handler_;
+    }
+
 private:
     CefRefPtr<CefRenderHandler> render_handler_;
     CefRefPtr<CefLoadHandler> load_handler_;
+    CefRefPtr<CefLifeSpanHandler> lifespan_handler_;
 
     IMPLEMENT_REFCOUNTING(CefClientImpl);
 };
@@ -305,8 +352,11 @@ gboolean cef_browser_start(GstChromiumSrc *src, const gchar *url, gint width, gi
     CefRefPtr<CefLoadHandlerImpl> load_handler =
         new CefLoadHandlerImpl(src);
 
+    CefRefPtr<CefLifeSpanHandlerImpl> lifespan_handler =
+        new CefLifeSpanHandlerImpl(src);
+
     CefRefPtr<CefClientImpl> client =
-        new CefClientImpl(render_handler, load_handler);
+        new CefClientImpl(render_handler, load_handler, lifespan_handler);
 
     CefWindowInfo window_info;
     window_info.SetAsWindowless(0);
@@ -316,19 +366,14 @@ gboolean cef_browser_start(GstChromiumSrc *src, const gchar *url, gint width, gi
 
     CefString cef_url(url);
 
-    CefRefPtr<CefBrowser> browser = CefBrowserHost::CreateBrowserSync(
-        window_info, client, cef_url, browser_settings, nullptr, nullptr);
+    src->cef_client = static_cast<gpointer>(client.get());
+    client->AddRef();
 
-    if (!browser) {
+    if (!CefBrowserHost::CreateBrowser(window_info, client, cef_url,
+            browser_settings, nullptr, nullptr)) {
         g_warning("Failed to create CEF browser");
         return FALSE;
     }
-
-    src->cef_browser = static_cast<gpointer>(browser.get());
-    browser->AddRef();
-
-    src->cef_client = static_cast<gpointer>(client.get());
-    client->AddRef();
 
     src->cef_thread = g_thread_new("cef-message-loop",
         cef_message_loop_thread, src);
