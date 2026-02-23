@@ -44,6 +44,16 @@ static void gst_chromium_src_need_data(GstAppSrc *appsrc, guint length,
     gpointer user_data);
 static void gst_chromium_src_enough_data(GstAppSrc *appsrc, gpointer user_data);
 
+/**
+ * gst_chromium_src_class_init:
+ * @klass: The class structure to initialize
+ *
+ * Initializes the GstChromiumSrcClass, setting up GObject properties,
+ * GStreamer element metadata, pad templates, and virtual function pointers.
+ *
+ * Invoked automatically by G_DEFINE_TYPE when the type is first registered
+ * with the GType system (typically when the plugin is loaded).
+ */
 static void gst_chromium_src_class_init(GstChromiumSrcClass *klass) {
     GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
     GstElementClass *gstelement_class = GST_ELEMENT_CLASS(klass);
@@ -89,6 +99,18 @@ static void gst_chromium_src_class_init(GstChromiumSrcClass *klass) {
     gstelement_class->change_state = gst_chromium_src_change_state;
 }
 
+/**
+ * gst_chromium_src_init:
+ * @src: The instance to initialize
+ *
+ * Initializes a new GstChromiumSrc instance. Sets default property values,
+ * creates the internal appsrc element, sets up ghost pad, configures
+ * appsrc properties, connects signals, and initializes synchronization
+ * primitives and CEF-related fields.
+ *
+ * Invoked automatically by GStreamer when a new chromiumsrc element
+ * is created (e.g., via gst_element_factory_make).
+ */
 static void gst_chromium_src_init(GstChromiumSrc *src) {
     src->url = g_strdup("https://pingup.de/w/png-test.html");
     src->width = 1920;
@@ -133,6 +155,18 @@ static void gst_chromium_src_init(GstChromiumSrc *src) {
     src->cef_thread = NULL;
 }
 
+/**
+ * gst_chromium_src_set_property:
+ * @object: The GObject instance
+ * @prop_id: The property ID (PROP_URL, PROP_WIDTH, etc.)
+ * @value: The new value to set
+ * @pspec: The property specification
+ *
+ * Handles setting of GObject properties (url, width, height, framerate).
+ * Parses framerate string in "num/denom" format.
+ *
+ * Invoked by GObject when application code calls g_object_set() on the element.
+ */
 static void gst_chromium_src_set_property(GObject *object, guint prop_id,
     const GValue *value, GParamSpec *pspec) {
     GstChromiumSrc *src = GST_CHROMIUM_SRC(object);
@@ -164,6 +198,17 @@ static void gst_chromium_src_set_property(GObject *object, guint prop_id,
     }
 }
 
+/**
+ * gst_chromium_src_get_property:
+ * @object: The GObject instance
+ * @prop_id: The property ID (PROP_URL, PROP_WIDTH, etc.)
+ * @value: The value to fill
+ * @pspec: The property specification
+ *
+ * Handles retrieval of GObject properties. Formats framerate as "num/denom".
+ *
+ * Invoked by GObject when application code calls g_object_get() on the element.
+ */
 static void gst_chromium_src_get_property(GObject *object, guint prop_id,
     GValue *value, GParamSpec *pspec) {
     GstChromiumSrc *src = GST_CHROMIUM_SRC(object);
@@ -189,6 +234,16 @@ static void gst_chromium_src_get_property(GObject *object, guint prop_id,
     }
 }
 
+/**
+ * gst_chromium_src_finalize:
+ * @object: The GObject instance being finalized
+ *
+ * Releases all resources held by the GstChromiumSrc instance including
+ * allocated strings, frame buffer, and synchronization primitives.
+ *
+ * Invoked by GObject when the last reference to the element is dropped
+ * and the object is being destroyed.
+ */
 static void gst_chromium_src_finalize(GObject *object) {
     GstChromiumSrc *src = GST_CHROMIUM_SRC(object);
 
@@ -200,6 +255,20 @@ static void gst_chromium_src_finalize(GObject *object) {
     G_OBJECT_CLASS(parent_class)->finalize(object);
 }
 
+/**
+ * gst_chromium_src_need_data:
+ * @appsrc: The internal appsrc element requesting data
+ * @length: Hint for the amount of data needed (not used)
+ * @user_data: The GstChromiumSrc instance
+ *
+ * Callback invoked when the downstream pipeline needs more data.
+ * Waits for a frame from CEF (signaled via frame_cond), copies it to
+ * a GstBuffer with proper timestamps, and pushes it downstream.
+ * Implements the producer side of the frame synchronization.
+ *
+ * Invoked by appsrc when its internal buffer runs low and it needs
+ * more data to feed the downstream pipeline.
+ */
 static void gst_chromium_src_need_data(GstAppSrc *appsrc, guint length,
     gpointer user_data) {
     GstChromiumSrc *src = GST_CHROMIUM_SRC(user_data);
@@ -262,11 +331,35 @@ static void gst_chromium_src_need_data(GstAppSrc *appsrc, guint length,
     }
 }
 
+/**
+ * gst_chromium_src_enough_data:
+ * @appsrc: The internal appsrc element
+ * @user_data: The GstChromiumSrc instance
+ *
+ * Callback invoked when the internal appsrc buffer is full.
+ * Currently only logs a debug message; could be used to pause
+ * frame production if needed.
+ *
+ * Invoked by appsrc when its internal queue reaches max-bytes limit.
+ */
 static void gst_chromium_src_enough_data(GstAppSrc *appsrc, gpointer user_data) {
     GstChromiumSrc *src = GST_CHROMIUM_SRC(user_data);
     GST_DEBUG_OBJECT(src, "enough-data");
 }
 
+/**
+ * gst_chromium_src_start:
+ * @src: The GstChromiumSrc instance
+ *
+ * Starts the Chromium source by allocating the frame buffer, setting
+ * caps on the internal appsrc, and launching the CEF browser instance
+ * in a separate thread.
+ *
+ * Invoked during the READY_TO_PAUSED state transition in
+ * gst_chromium_src_change_state().
+ *
+ * Returns: TRUE on success, FALSE on failure
+ */
 static gboolean gst_chromium_src_start(GstChromiumSrc *src) {
     GstCaps *caps;
 
@@ -313,6 +406,19 @@ static gboolean gst_chromium_src_start(GstChromiumSrc *src) {
     return TRUE;
 }
 
+/**
+ * gst_chromium_src_stop:
+ * @src: The GstChromiumSrc instance
+ *
+ * Stops the Chromium source by signaling the CEF thread to stop,
+ * waiting for it to join, cleaning up CEF resources, freeing the
+ * frame buffer, and sending EOS to the internal appsrc.
+ *
+ * Invoked during the PAUSED_TO_READY state transition in
+ * gst_chromium_src_change_state().
+ *
+ * Returns: TRUE always
+ */
 static gboolean gst_chromium_src_stop(GstChromiumSrc *src) {
     GST_INFO_OBJECT(src, "Stopping Chromium source");
 
@@ -335,6 +441,21 @@ static gboolean gst_chromium_src_stop(GstChromiumSrc *src) {
     return TRUE;
 }
 
+/**
+ * gst_chromium_src_change_state:
+ * @element: The GstElement instance
+ * @transition: The state transition being performed
+ *
+ * Handles GStreamer state transitions. Calls gst_chromium_src_start()
+ * when transitioning from READY to PAUSED, and gst_chromium_src_stop()
+ * when transitioning from PAUSED to READY. Chains up to parent class
+ * for default handling.
+ *
+ * Invoked by GStreamer pipeline when the element's state changes
+ * (e.g., via gst_element_set_state()).
+ *
+ * Returns: The result of the state change
+ */
 static GstStateChangeReturn gst_chromium_src_change_state(
 		GstElement *element,
 		GstStateChange transition) {
@@ -372,6 +493,19 @@ static GstStateChangeReturn gst_chromium_src_change_state(
     return ret;
 }
 
+/**
+ * plugin_init:
+ * @plugin: The GStreamer plugin being initialized
+ *
+ * Registers the chromiumsrc element with GStreamer. This is the
+ * plugin's entry point that makes the element available to
+ * applications.
+ *
+ * Invoked by GStreamer once when the plugin is first loaded
+ * (via gst_plugin_load or auto-loading from plugin directory).
+ *
+ * Returns: TRUE on success, FALSE on failure
+ */
 static gboolean plugin_init(GstPlugin *plugin) {
     return gst_element_register(plugin, "chromiumsrc", GST_RANK_NONE,
         GST_TYPE_CHROMIUM_SRC);
