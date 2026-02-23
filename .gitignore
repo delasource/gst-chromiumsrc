@@ -5,6 +5,7 @@
 
 # CEF wrapper build
 build_cef_wrapper/
+third_party/cef/
 
 # IDE/Editor
 .vscode/
