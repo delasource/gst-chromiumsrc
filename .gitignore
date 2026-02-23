@@ -1,0 +1,21 @@
+# Build artifacts
+*.o
+*.so
+*.a
+
+# CEF wrapper build
+build_cef_wrapper/
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# GStreamer cache
+cef_cache/
