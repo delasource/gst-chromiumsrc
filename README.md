@@ -1,40 +1,40 @@
-# cefsrc - GStreamer CEF Source Plugin
+# chromiumsrc - GStreamer Chromium Source Plugin
 
 Offscreen Chromium browser as a GStreamer video source using CEF (Chromium Embedded Framework).
 
 ## Architecture
 
 ```
-gst-launch-1.0 cefsrc url="https://example.com" ! videoconvert ! autovideosink
-                    │
-                    ▼
-              ┌─────────────┐
-              │  GstCefSrc  │  (GstBin subclass)
-              │             │
-              │  ┌───────┐  │
-              │  │appsrc │  │  ← pull mode via need-data signal
-              │  └───┬───┘  │
-              └──────┼──────┘
+gst-launch-1.0 chromiumsrc url="https://example.com" ! videoconvert ! autovideosink
                      │
                      ▼
-              ┌─────────────┐
-              │ CEF Browser │  (offscreen, windowless)
-              │             │
-              │ OnPaint()   │  → BGRA frames → appsrc
-              └─────────────┘
+               ┌─────────────────┐
+               │ GstChromiumSrc  │  (GstBin subclass)
+               │                 │
+               │  ┌───────┐      │
+               │  │appsrc │      │  ← pull mode via need-data signal
+               │  └───┬───┘      │
+               └──────┼──────────┘
+                      │
+                      ▼
+               ┌─────────────┐
+               │ CEF Browser │  (offscreen, windowless)
+               │             │
+               │ OnPaint()   │  → BGRA frames → appsrc
+               └─────────────┘
 ```
 
 ## Files
 
-| File                     | Purpose                                                         |
-|--------------------------|-----------------------------------------------------------------|
-| `gstcefsrc.h`            | GstCefSrc type definitions (GstBin + appsrc + CEF state)        |
-| `gstcefsrc.cpp`          | GStreamer element: properties, state changes, need-data handler |
-| `cef_render_handler.h`   | CEF handler declarations                                        |
-| `cef_render_handler.cpp` | CEF integration: browser lifecycle, OnPaint → frame buffer      |
-| `Makefile`               | Build configuration                                             |
-| `third_party/cef/`       | CEF distribution                                                |
-| `build_cef_wrapper/`     | Compiled libcef_dll_wrapper.a                                   |
+| File                       | Purpose                                                         |
+|----------------------------|-----------------------------------------------------------------|
+| `gstchromiumsrc.h`         | GstChromiumSrc type definitions (GstBin + appsrc + CEF state)   |
+| `gstchromiumsrc.cpp`       | GStreamer element: properties, state changes, need-data handler |
+| `cef_render_handler.h`     | CEF handler declarations                                        |
+| `cef_render_handler.cpp`   | CEF integration: browser lifecycle, OnPaint → frame buffer      |
+| `Makefile`                 | Build configuration                                             |
+| `third_party/cef/`         | CEF distribution                                                |
+| `build_cef_wrapper/`       | Compiled libcef_dll_wrapper.a                                   |
 
 ## Data Flow
 

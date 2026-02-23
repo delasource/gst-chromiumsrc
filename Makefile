@@ -13,7 +13,7 @@ CXXFLAGS = -std=c++20 -fPIC -shared -O2 -fpermissive \
     -I$(CEF_DIR) \
     $(GST_CFLAGS) \
     $(GLIB_CFLAGS) \
-    -DPACKAGE=\"cefsrc\" \
+    -DPACKAGE=\"chromiumsrc\" \
     -DPACKAGE_VERSION=\"1.0.0\"
 
 LDFLAGS = $(CEF_WRAPPER) -L$(CEF_LIB_DIR) -lcef \
@@ -21,15 +21,15 @@ LDFLAGS = $(CEF_WRAPPER) -L$(CEF_LIB_DIR) -lcef \
     $(GLIB_LIBS) \
     -Wl,-rpath,'$$ORIGIN/../$(CEF_LIB_DIR)'
 
-SOURCES = gstcefsrc.cpp cef_render_handler.cpp
+SOURCES = gstchromiumsrc.cpp cef_render_handler.cpp
 
-PLUGIN = libgstcefsrc.so
+PLUGIN = libgstchromiumsrc.so
 
 .PHONY: all clean install
 
 all: $(PLUGIN)
 
-$(PLUGIN): $(SOURCES) gstcefsrc.h cef_render_handler.h
+$(PLUGIN): $(SOURCES) gstchromiumsrc.h cef_render_handler.h
 	g++ $(CXXFLAGS) -o $@ $(SOURCES) $(LDFLAGS)
 
 install: $(PLUGIN)
@@ -40,4 +40,4 @@ clean:
 	rm -f $(PLUGIN)
 
 test: $(PLUGIN)
-	GST_PLUGIN_PATH=. gst-launch-1.0 cefsrc url="https://pingup.de/w/png-test.html" width=1920 height=1080 ! videoconvert ! autovideosink
+	GST_PLUGIN_PATH=. gst-launch-1.0 chromiumsrc url="https://pingup.de/w/png-test.html" width=1920 height=1080 ! videoconvert ! autovideosink

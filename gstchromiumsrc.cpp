@@ -1,11 +1,11 @@
-#include "gstcefsrc.h"
+#include "gstchromiumsrc.h"
 #include "cef_render_handler.h"
 
 #include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
 
-GST_DEBUG_CATEGORY_STATIC(cef_src_debug);
-#define GST_CAT_DEFAULT cef_src_debug
+GST_DEBUG_CATEGORY_STATIC(chromium_src_debug);
+#define GST_CAT_DEFAULT chromium_src_debug
 
 enum {
     PROP_0,
@@ -28,31 +28,31 @@ static GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE(
     )
 );
 
-#define gst_cef_src_parent_class parent_class
-G_DEFINE_TYPE(GstCefSrc, gst_cef_src, GST_TYPE_BIN);
+#define gst_chromium_src_parent_class parent_class
+G_DEFINE_TYPE(GstChromiumSrc, gst_chromium_src, GST_TYPE_BIN);
 
-static void gst_cef_src_set_property(GObject *object, guint prop_id,
+static void gst_chromium_src_set_property(GObject *object, guint prop_id,
     const GValue *value, GParamSpec *pspec);
-static void gst_cef_src_get_property(GObject *object, guint prop_id,
+static void gst_chromium_src_get_property(GObject *object, guint prop_id,
     GValue *value, GParamSpec *pspec);
-static void gst_cef_src_finalize(GObject *object);
+static void gst_chromium_src_finalize(GObject *object);
 
-static GstStateChangeReturn gst_cef_src_change_state(
+static GstStateChangeReturn gst_chromium_src_change_state(
     GstElement *element, GstStateChange transition);
 
-static void gst_cef_src_need_data(GstAppSrc *appsrc, guint length,
+static void gst_chromium_src_need_data(GstAppSrc *appsrc, guint length,
     gpointer user_data);
-static void gst_cef_src_enough_data(GstAppSrc *appsrc, gpointer user_data);
+static void gst_chromium_src_enough_data(GstAppSrc *appsrc, gpointer user_data);
 
-static void gst_cef_src_class_init(GstCefSrcClass *klass) {
+static void gst_chromium_src_class_init(GstChromiumSrcClass *klass) {
     GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
     GstElementClass *gstelement_class = GST_ELEMENT_CLASS(klass);
 
-    GST_DEBUG_CATEGORY_INIT(cef_src_debug, "cefsrc", 0, "CEF Source");
+    GST_DEBUG_CATEGORY_INIT(chromium_src_debug, "chromiumsrc", 0, "Chromium Source");
 
-    gobject_class->set_property = gst_cef_src_set_property;
-    gobject_class->get_property = gst_cef_src_get_property;
-    gobject_class->finalize = gst_cef_src_finalize;
+    gobject_class->set_property = gst_chromium_src_set_property;
+    gobject_class->get_property = gst_chromium_src_get_property;
+    gobject_class->finalize = gst_chromium_src_finalize;
 
     g_object_class_install_property(gobject_class, PROP_URL,
         g_param_spec_string("url", "URL",
@@ -79,17 +79,17 @@ static void gst_cef_src_class_init(GstCefSrcClass *klass) {
             G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
     gst_element_class_set_metadata(gstelement_class,
-        "CEF Source",
+        "Chromium Source",
         "Source/Video",
         "Offscreen CEF/Chromium browser as video source",
         "opencode");
 
     gst_element_class_add_static_pad_template(gstelement_class, &src_template);
 
-    gstelement_class->change_state = gst_cef_src_change_state;
+    gstelement_class->change_state = gst_chromium_src_change_state;
 }
 
-static void gst_cef_src_init(GstCefSrc *src) {
+static void gst_chromium_src_init(GstChromiumSrc *src) {
     src->url = g_strdup("https://pingup.de/w/png-test.html");
     src->width = 1920;
     src->height = 1080;
@@ -115,9 +115,9 @@ static void gst_cef_src_init(GstCefSrc *src) {
     g_object_set(src->appsrc, "max-bytes", (guint64)(1920 * 1080 * 4 * 3), NULL);
 
     g_signal_connect(src->appsrc, "need-data",
-        G_CALLBACK(gst_cef_src_need_data), src);
+        G_CALLBACK(gst_chromium_src_need_data), src);
     g_signal_connect(src->appsrc, "enough-data",
-        G_CALLBACK(gst_cef_src_enough_data), src);
+        G_CALLBACK(gst_chromium_src_enough_data), src);
 
     src->frame_buffer = NULL;
     src->frame_size = 0;
@@ -133,9 +133,9 @@ static void gst_cef_src_init(GstCefSrc *src) {
     src->cef_thread = NULL;
 }
 
-static void gst_cef_src_set_property(GObject *object, guint prop_id,
+static void gst_chromium_src_set_property(GObject *object, guint prop_id,
     const GValue *value, GParamSpec *pspec) {
-    GstCefSrc *src = GST_CEF_SRC(object);
+    GstChromiumSrc *src = GST_CHROMIUM_SRC(object);
 
     switch (prop_id) {
         case PROP_URL:
@@ -164,9 +164,9 @@ static void gst_cef_src_set_property(GObject *object, guint prop_id,
     }
 }
 
-static void gst_cef_src_get_property(GObject *object, guint prop_id,
+static void gst_chromium_src_get_property(GObject *object, guint prop_id,
     GValue *value, GParamSpec *pspec) {
-    GstCefSrc *src = GST_CEF_SRC(object);
+    GstChromiumSrc *src = GST_CHROMIUM_SRC(object);
 
     switch (prop_id) {
         case PROP_URL:
@@ -189,8 +189,8 @@ static void gst_cef_src_get_property(GObject *object, guint prop_id,
     }
 }
 
-static void gst_cef_src_finalize(GObject *object) {
-    GstCefSrc *src = GST_CEF_SRC(object);
+static void gst_chromium_src_finalize(GObject *object) {
+    GstChromiumSrc *src = GST_CHROMIUM_SRC(object);
 
     g_free(src->url);
     g_free(src->frame_buffer);
@@ -200,9 +200,9 @@ static void gst_cef_src_finalize(GObject *object) {
     G_OBJECT_CLASS(parent_class)->finalize(object);
 }
 
-static void gst_cef_src_need_data(GstAppSrc *appsrc, guint length,
+static void gst_chromium_src_need_data(GstAppSrc *appsrc, guint length,
     gpointer user_data) {
-    GstCefSrc *src = GST_CEF_SRC(user_data);
+    GstChromiumSrc *src = GST_CHROMIUM_SRC(user_data);
     GstBuffer *buffer;
     GstMapInfo map;
     GstFlowReturn ret;
@@ -262,15 +262,15 @@ static void gst_cef_src_need_data(GstAppSrc *appsrc, guint length,
     }
 }
 
-static void gst_cef_src_enough_data(GstAppSrc *appsrc, gpointer user_data) {
-    GstCefSrc *src = GST_CEF_SRC(user_data);
+static void gst_chromium_src_enough_data(GstAppSrc *appsrc, gpointer user_data) {
+    GstChromiumSrc *src = GST_CHROMIUM_SRC(user_data);
     GST_DEBUG_OBJECT(src, "enough-data");
 }
 
-static gboolean gst_cef_src_start(GstCefSrc *src) {
+static gboolean gst_chromium_src_start(GstChromiumSrc *src) {
     GstCaps *caps;
 
-    GST_INFO_OBJECT(src, "Starting CEF source: %s", src->url);
+    GST_INFO_OBJECT(src, "Starting Chromium source: %s", src->url);
 
     if (!src->url) {
         GST_ELEMENT_ERROR(src, RESOURCE, SETTINGS,
@@ -309,12 +309,12 @@ static gboolean gst_cef_src_start(GstCefSrc *src) {
         return FALSE;
     }
 
-    GST_INFO_OBJECT(src, "CEF source started successfully");
+    GST_INFO_OBJECT(src, "Chromium source started successfully");
     return TRUE;
 }
 
-static gboolean gst_cef_src_stop(GstCefSrc *src) {
-    GST_INFO_OBJECT(src, "Stopping CEF source");
+static gboolean gst_chromium_src_stop(GstChromiumSrc *src) {
+    GST_INFO_OBJECT(src, "Stopping Chromium source");
 
     g_mutex_lock(&src->frame_mutex);
     src->running = FALSE;
@@ -331,20 +331,20 @@ static gboolean gst_cef_src_stop(GstCefSrc *src) {
         gst_app_src_end_of_stream(src->appsrc);
     }
 
-    GST_INFO_OBJECT(src, "CEF source stopped");
+    GST_INFO_OBJECT(src, "Chromium source stopped");
     return TRUE;
 }
 
-static GstStateChangeReturn gst_cef_src_change_state(
+static GstStateChangeReturn gst_chromium_src_change_state(
     GstElement *element, GstStateChange transition) {
-    GstCefSrc *src = GST_CEF_SRC(element);
+    GstChromiumSrc *src = GST_CHROMIUM_SRC(element);
     GstStateChangeReturn ret;
 
     switch (transition) {
         case GST_STATE_CHANGE_NULL_TO_READY:
             break;
         case GST_STATE_CHANGE_READY_TO_PAUSED:
-            if (!gst_cef_src_start(src)) {
+            if (!gst_chromium_src_start(src)) {
                 return GST_STATE_CHANGE_FAILURE;
             }
             break;
@@ -360,7 +360,7 @@ static GstStateChangeReturn gst_cef_src_change_state(
         case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
             break;
         case GST_STATE_CHANGE_PAUSED_TO_READY:
-            gst_cef_src_stop(src);
+            gst_chromium_src_stop(src);
             break;
         case GST_STATE_CHANGE_READY_TO_NULL:
             break;
@@ -372,18 +372,18 @@ static GstStateChangeReturn gst_cef_src_change_state(
 }
 
 static gboolean plugin_init(GstPlugin *plugin) {
-    return gst_element_register(plugin, "cefsrc", GST_RANK_NONE,
-        GST_TYPE_CEF_SRC);
+    return gst_element_register(plugin, "chromiumsrc", GST_RANK_NONE,
+        GST_TYPE_CHROMIUM_SRC);
 }
 
 GST_PLUGIN_DEFINE(
     GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    cefsrc,
+    chromiumsrc,
     "CEF/Chromium browser as video source",
     plugin_init,
     "1.0.0",
     "LGPL",
-    "cefsrc",
-    "https://github.com/opencode/cefsrc"
+    "chromiumsrc",
+    "https://github.com/opencode/chromiumsrc"
 )

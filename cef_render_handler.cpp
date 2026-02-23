@@ -1,5 +1,5 @@
 #include "cef_render_handler.h"
-#include "gstcefsrc.h"
+#include "gstchromiumsrc.h"
 
 #include <include/cef_app.h>
 #include <include/cef_browser.h>
@@ -14,7 +14,7 @@ static gboolean cef_initialized = FALSE;
 
 class CefRenderHandlerImpl : public CefRenderHandler {
 public:
-    CefRenderHandlerImpl(GstCefSrc *src, int width, int height)
+    CefRenderHandlerImpl(GstChromiumSrc *src, int width, int height)
         : src_(src), width_(width), height_(height) {}
 
     void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect) override {
@@ -49,7 +49,7 @@ public:
     }
 
 private:
-    GstCefSrc *src_;
+    GstChromiumSrc *src_;
     int width_;
     int height_;
 
@@ -58,7 +58,7 @@ private:
 
 class CefLoadHandlerImpl : public CefLoadHandler {
 public:
-    CefLoadHandlerImpl(GstCefSrc *src) : src_(src) {}
+    CefLoadHandlerImpl(GstChromiumSrc *src) : src_(src) {}
 
     void OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
         int httpStatusCode) override {
@@ -77,7 +77,7 @@ public:
     }
 
 private:
-    GstCefSrc *src_;
+    GstChromiumSrc *src_;
     IMPLEMENT_REFCOUNTING(CefLoadHandlerImpl);
 };
 
@@ -102,7 +102,7 @@ private:
 };
 
 static gpointer cef_message_loop_thread(gpointer data) {
-    GstCefSrc *src = (GstCefSrc *)data;
+    GstChromiumSrc *src = (GstChromiumSrc *)data;
     int count = 0;
 
     while (src->running) {
@@ -160,9 +160,10 @@ static gboolean initialize_cef(void) {
     return TRUE;
 }
 
+
 extern "C" {
 
-gboolean cef_browser_start(GstCefSrc *src, const gchar *url, gint width, gint height) {
+gboolean cef_browser_start(GstChromiumSrc *src, const gchar *url, gint width, gint height) {
     if (!initialize_cef()) {
         return FALSE;
     }
@@ -196,7 +197,7 @@ gboolean cef_browser_start(GstCefSrc *src, const gchar *url, gint width, gint he
 
     src->cef_browser = static_cast<gpointer>(browser.get());
     browser->AddRef();
-    
+
     src->cef_client = static_cast<gpointer>(client.get());
     client->AddRef();
 
@@ -211,7 +212,7 @@ gboolean cef_browser_start(GstCefSrc *src, const gchar *url, gint width, gint he
     return TRUE;
 }
 
-void cef_browser_stop(GstCefSrc *src) {
+void cef_browser_stop(GstChromiumSrc *src) {
     if (!src) {
         return;
     }
