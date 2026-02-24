@@ -76,25 +76,25 @@ static void gst_chromium_src_class_init(GstChromiumSrcClass *klass) {
         g_param_spec_string("url", "URL",
             "URL to render in the browser",
             "https://example.com/test.html",
-            G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     g_object_class_install_property(gobject_class, PROP_WIDTH,
         g_param_spec_int("width", "Width",
             "Video width in pixels",
             1, G_MAXINT, 1920,
-            G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     g_object_class_install_property(gobject_class, PROP_HEIGHT,
         g_param_spec_int("height", "Height",
             "Video height in pixels",
             1, G_MAXINT, 1080,
-            G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     g_object_class_install_property(gobject_class, PROP_FRAMERATE,
         g_param_spec_string("framerate", "Framerate",
             "Output framerate in frames per second (e.g., 30)",
             "30",
-            G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     gst_element_class_set_metadata(gstelement_class,
         "Chromium Source",

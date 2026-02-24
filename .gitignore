@@ -2,6 +2,8 @@
 *.o
 *.so
 *.a
+*.dylib
+
 
 # CEF wrapper build
 build_cef_wrapper/

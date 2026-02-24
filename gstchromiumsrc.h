@@ -31,7 +31,7 @@ struct _GstChromiumSrc {
 
     gpointer cef_browser;
     gpointer cef_client;
-    gpointer cef_thread;
+    GThread  *cef_thread;
 
     guint8   *frame_buffer;
     gsize    frame_size;
