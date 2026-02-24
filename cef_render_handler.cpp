@@ -19,13 +19,26 @@ static void gpu_ensure_config(GstChromiumSrc *src) {
 
     gpu_config = gpu_config_new();
 
-    if (src->gpu_enabled || gpu_is_available()) {
-        gpu_config_detect(gpu_config);
-        src->gpu_enabled = gpu_config->enabled;
-        src->gpu_device = gpu_config->device_index;
-        g_print("DEBUG: GPU config - enabled=%d, device=%s\n",
-                gpu_config->enabled, gpu_config->device_path ? gpu_config->device_path : "none");
+    g_print("DEBUG: gpu_ensure_config - user_specified=%d, gpu_enabled=%d, gpu_available=%d\n",
+            src->gpu_user_specified, src->gpu_enabled, gpu_is_available());
+
+    if (src->gpu_user_specified) {
+        if (src->gpu_enabled && gpu_is_available()) {
+            gpu_config_detect(gpu_config);
+            src->gpu_device = gpu_config->device_index;
+        } else {
+            gpu_config->enabled = FALSE;
+            src->gpu_enabled = FALSE;
+        }
+    } else {
+        if (gpu_is_available()) {
+            gpu_config_detect(gpu_config);
+            src->gpu_enabled = gpu_config->enabled;
+            src->gpu_device = gpu_config->device_index;
+        }
     }
+    g_print("DEBUG: GPU config - enabled=%d, device=%s\n",
+            src->gpu_enabled, gpu_config->device_path ? gpu_config->device_path : "none");
 }
 
 /**
@@ -307,6 +320,56 @@ static gboolean initialize_cef(void) {
         return TRUE;
     }
 
+    class CefAppImpl : public CefApp, public CefBrowserProcessHandler {
+    public:
+        CefAppImpl() {}
+
+        void OnBeforeCommandLineProcessing(
+            const CefString& process_type,
+            CefRefPtr<CefCommandLine> command_line) override {
+
+            command_line->AppendSwitch("disable-extensions");
+            command_line->AppendSwitch("disable-sync");
+            command_line->AppendSwitch("disable-background-networking");
+            command_line->AppendSwitch("no-first-run");
+            command_line->AppendSwitch("disable-gpu-sandbox");
+            command_line->AppendSwitch("disable-seccomp-filter-sandbox");
+            command_line->AppendSwitch("no-sandbox");
+            command_line->AppendSwitchWithValue("log-severity", "warning");
+            command_line->AppendSwitch("single-process");
+
+            gboolean has_display = g_getenv("DISPLAY") != NULL;
+
+            if (gpu_config && gpu_config->enabled) {
+                g_print("DEBUG: GPU mode enabled (device: %s)\n", gpu_config->device_path);
+                command_line->AppendSwitchWithValue("use-gl", "egl");
+                command_line->AppendSwitchWithValue("use-angle", "egl");
+                command_line->AppendSwitch("enable-gpu-rasterization");
+                command_line->AppendSwitch("enable-zero-copy");
+                command_line->AppendSwitch("ignore-gpu-blocklist");
+
+                if (!has_display) {
+                    command_line->AppendSwitchWithValue("ozone-platform", "headless");
+                    command_line->AppendSwitchWithValue("headless", "new");
+                    g_print("DEBUG: GPU headless mode (EGL)\n");
+                }
+            } else if (!has_display) {
+                command_line->AppendSwitchWithValue("ozone-platform", "headless");
+                command_line->AppendSwitchWithValue("headless", "new");
+                command_line->AppendSwitch("disable-gpu");
+                command_line->AppendSwitch("disable-gpu-compositing");
+                command_line->AppendSwitch("disable-software-rasterizer");
+                g_print("DEBUG: CPU headless mode (no DISPLAY, no GPU)\n");
+            }
+        }
+
+        CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override {
+            return this;
+        }
+
+        IMPLEMENT_REFCOUNTING(CefAppImpl);
+    };
+
     CefMainArgs main_args;
     CefSettings settings;
 
@@ -347,37 +410,7 @@ static gboolean initialize_cef(void) {
         g_free(resources_dir);
     }
 
-    CefRefPtr<CefCommandLine> command_line = CefCommandLine::CreateCommandLine();
-    command_line->AppendSwitch("disable-extensions");
-    command_line->AppendSwitch("disable-sync");
-    command_line->AppendSwitch("disable-background-networking");
-    command_line->AppendSwitch("no-first-run");
-    command_line->AppendSwitchWithValue("log-severity", "warning");
-
-    gboolean has_display = g_getenv("DISPLAY") != NULL;
-
-    if (gpu_config && gpu_config->enabled) {
-        g_print("DEBUG: GPU mode enabled (device: %s)\n", gpu_config->device_path);
-        command_line->AppendSwitchWithValue("use-gl", "egl");
-        command_line->AppendSwitchWithValue("use-angle", "egl");
-        command_line->AppendSwitch("enable-gpu-rasterization");
-        command_line->AppendSwitch("enable-zero-copy");
-        command_line->AppendSwitch("ignore-gpu-blocklist");
-
-        if (!has_display) {
-            command_line->AppendSwitchWithValue("ozone-platform", "headless");
-            g_print("DEBUG: GPU headless mode (EGL)\n");
-        }
-    } else if (!has_display) {
-        command_line->AppendSwitchWithValue("ozone-platform", "headless");
-        command_line->AppendSwitchWithValue("headless", "new");
-        command_line->AppendSwitch("disable-gpu");
-        command_line->AppendSwitch("disable-gpu-compositing");
-        command_line->AppendSwitch("disable-software-rasterizer");
-        g_print("DEBUG: CPU headless mode (no DISPLAY, no GPU)\n");
-    }
-
-    CefRefPtr<CefApp> app;
+    CefRefPtr<CefAppImpl> app = new CefAppImpl();
 
     if (!CefInitialize(main_args, settings, app, nullptr)) {
         g_mutex_unlock(&cef_init_mutex);

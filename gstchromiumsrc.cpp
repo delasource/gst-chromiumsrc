@@ -160,6 +160,7 @@ static void gst_chromium_src_init(GstChromiumSrc *src) {
     src->running = FALSE;
     src->frame_count = 0;
     src->gpu_enabled = FALSE;
+    src->gpu_user_specified = FALSE;
     src->gpu_device = -1;
 
     g_mutex_init(&src->frame_mutex);
@@ -213,6 +214,7 @@ static void gst_chromium_src_set_property(
         case PROP_GPU: {
             const gchar *gpu_str = g_value_get_string(value);
             if (gpu_str) {
+                src->gpu_user_specified = TRUE;
                 if (g_ascii_strcasecmp(gpu_str, "true") == 0 ||
                     g_ascii_strcasecmp(gpu_str, "1") == 0 ||
                     g_ascii_strcasecmp(gpu_str, "yes") == 0) {
@@ -221,6 +223,8 @@ static void gst_chromium_src_set_property(
                            g_ascii_strcasecmp(gpu_str, "0") == 0 ||
                            g_ascii_strcasecmp(gpu_str, "no") == 0) {
                     src->gpu_enabled = FALSE;
+                } else {
+                    src->gpu_user_specified = FALSE;
                 }
             }
             break;

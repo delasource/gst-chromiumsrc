@@ -42,6 +42,7 @@ struct _GstChromiumSrc {
     gboolean running;
     gboolean page_loaded;
     gboolean gpu_enabled;
+    gboolean gpu_user_specified;
 
     guint64 frame_count;
 };
