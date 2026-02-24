@@ -9,6 +9,7 @@
 
 G_BEGIN_DECLS
 
+void cef_set_single_process(gboolean single_process);
 gboolean cef_browser_start(GstChromiumSrc *src, const gchar *url, gint width, gint height);
 void cef_browser_stop(GstChromiumSrc *src);
 

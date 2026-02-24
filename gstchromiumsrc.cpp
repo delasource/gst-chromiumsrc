@@ -13,7 +13,8 @@ enum {
     PROP_WIDTH,
     PROP_HEIGHT,
     PROP_FRAMERATE,
-    PROP_GPU
+    PROP_GPU,
+    PROP_SINGLE_PROCESS
 };
 
 static GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE(
@@ -103,6 +104,12 @@ static void gst_chromium_src_class_init(GstChromiumSrcClass *klass) {
             "auto",
             static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
+    g_object_class_install_property(gobject_class, PROP_SINGLE_PROCESS,
+        g_param_spec_boolean("single-process", "Single Process",
+            "Run CEF in single-process mode (default: false = multi-process)",
+            FALSE,
+            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
     gst_element_class_set_metadata(gstelement_class,
         "Chromium Source",
         "Source/Video",
@@ -162,6 +169,7 @@ static void gst_chromium_src_init(GstChromiumSrc *src) {
     src->gpu_enabled = FALSE;
     src->gpu_user_specified = FALSE;
     src->gpu_device = -1;
+    src->single_process = FALSE;
 
     g_mutex_init(&src->frame_mutex);
     g_cond_init(&src->frame_cond);
@@ -229,6 +237,9 @@ static void gst_chromium_src_set_property(
             }
             break;
         }
+        case PROP_SINGLE_PROCESS:
+            src->single_process = g_value_get_boolean(value);
+            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
             break;
@@ -269,6 +280,9 @@ static void gst_chromium_src_get_property(GObject *object,
         }
         case PROP_GPU:
             g_value_set_string(value, src->gpu_enabled ? "true" : "auto");
+            break;
+        case PROP_SINGLE_PROCESS:
+            g_value_set_boolean(value, src->single_process);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);

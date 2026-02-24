@@ -13,6 +13,11 @@
 static GMutex cef_init_mutex;
 static gboolean cef_initialized = FALSE;
 static GpuConfig *gpu_config = NULL;
+static gboolean single_process_mode = FALSE;
+
+void cef_set_single_process(gboolean single_process) {
+    single_process_mode = single_process;
+}
 
 static void gpu_ensure_config(GstChromiumSrc *src) {
     if (gpu_config) return;
@@ -336,13 +341,19 @@ static gboolean initialize_cef(void) {
             command_line->AppendSwitch("disable-seccomp-filter-sandbox");
             command_line->AppendSwitch("no-sandbox");
             command_line->AppendSwitchWithValue("log-severity", "warning");
-            command_line->AppendSwitch("single-process");
+
+            if (single_process_mode) {
+                command_line->AppendSwitch("single-process");
+                command_line->AppendSwitch("disable-zygote");
+                command_line->AppendSwitch("in-process-gpu");
+                g_print("DEBUG: Single-process mode enabled\n");
+            }
 
             gboolean has_display = g_getenv("DISPLAY") != NULL;
 
             if (gpu_config && gpu_config->enabled) {
                 g_print("DEBUG: GPU mode enabled (device: %s)\n", gpu_config->device_path);
-                command_line->AppendSwitchWithValue("use-gl", "egl");
+                command_line->AppendSwitchWithValue("use-gl", "egl-angle");
                 command_line->AppendSwitchWithValue("use-angle", "egl");
                 command_line->AppendSwitch("enable-gpu-rasterization");
                 command_line->AppendSwitch("enable-zero-copy");
@@ -371,6 +382,15 @@ static gboolean initialize_cef(void) {
     };
 
     CefMainArgs main_args;
+    CefRefPtr<CefAppImpl> app = new CefAppImpl();
+
+    if (!single_process_mode) {
+        int exit_code = CefExecuteProcess(main_args, app, nullptr);
+        if (exit_code >= 0) {
+            _exit(exit_code);
+        }
+    }
+
     CefSettings settings;
 
     settings.no_sandbox = TRUE;
@@ -410,8 +430,6 @@ static gboolean initialize_cef(void) {
         g_free(resources_dir);
     }
 
-    CefRefPtr<CefAppImpl> app = new CefAppImpl();
-
     if (!CefInitialize(main_args, settings, app, nullptr)) {
         g_mutex_unlock(&cef_init_mutex);
         g_warning("Failed to initialize CEF");
@@ -445,6 +463,7 @@ extern "C" {
  */
 gboolean cef_browser_start(GstChromiumSrc *src, const gchar *url, gint width, gint height) {
     gpu_ensure_config(src);
+    cef_set_single_process(src->single_process);
 
     if (!initialize_cef()) {
         return FALSE;
