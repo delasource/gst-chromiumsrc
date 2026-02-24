@@ -63,13 +63,15 @@ install: $(PLUGIN)
 	install_name_tool -change "@executable_path/../Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework" "@loader_path/Chromium Embedded Framework.framework/Chromium Embedded Framework" "$(INSTALL_DIR)/$(PLUGIN)"
 else
 CEF_LIBS = $(CEF_LIB_DIR)/libcef.so $(CEF_LIB_DIR)/libEGL.so $(CEF_LIB_DIR)/libGLESv2.so $(CEF_LIB_DIR)/libvulkan.so.1 $(CEF_LIB_DIR)/libvk_swiftshader.so
-CEF_RESOURCES = $(CEF_DIR)/Resources
+
+
 
 install: $(PLUGIN)
 	mkdir -p "$(INSTALL_DIR)"
 	cp $(PLUGIN) "$(INSTALL_DIR)/"
 	cp $(CEF_LIBS) "$(INSTALL_DIR)/"
-	cp -r $(CEF_RESOURCES) "$(INSTALL_DIR)/Resources"
+	cp -r "$(CEF_DIR)/Resources/*" "$(INSTALL_DIR)"
+	cp -r "$(CEF_DIR)/Release/*" "$(INSTALL_DIR)"
 endif
 
 clean:
