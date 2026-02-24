@@ -1,4 +1,5 @@
 #include "cef_render_handler.h"
+#include "gpu_utils.h"
 #include "gstchromiumsrc.h"
 
 #include <include/cef_app.h>
@@ -11,6 +12,21 @@
 
 static GMutex cef_init_mutex;
 static gboolean cef_initialized = FALSE;
+static GpuConfig *gpu_config = NULL;
+
+static void gpu_ensure_config(GstChromiumSrc *src) {
+    if (gpu_config) return;
+
+    gpu_config = gpu_config_new();
+
+    if (src->gpu_enabled || gpu_is_available()) {
+        gpu_config_detect(gpu_config);
+        src->gpu_enabled = gpu_config->enabled;
+        src->gpu_device = gpu_config->device_index;
+        g_print("DEBUG: GPU config - enabled=%d, device=%s\n",
+                gpu_config->enabled, gpu_config->device_path ? gpu_config->device_path : "none");
+    }
+}
 
 /**
  * CefRenderHandlerImpl - Handles offscreen rendering for CEF browser
@@ -338,13 +354,27 @@ static gboolean initialize_cef(void) {
     command_line->AppendSwitch("no-first-run");
     command_line->AppendSwitchWithValue("log-severity", "warning");
 
-    if (!g_getenv("DISPLAY")) {
+    gboolean has_display = g_getenv("DISPLAY") != NULL;
+
+    if (gpu_config && gpu_config->enabled) {
+        g_print("DEBUG: GPU mode enabled (device: %s)\n", gpu_config->device_path);
+        command_line->AppendSwitchWithValue("use-gl", "egl");
+        command_line->AppendSwitchWithValue("use-angle", "egl");
+        command_line->AppendSwitch("enable-gpu-rasterization");
+        command_line->AppendSwitch("enable-zero-copy");
+        command_line->AppendSwitch("ignore-gpu-blocklist");
+
+        if (!has_display) {
+            command_line->AppendSwitchWithValue("ozone-platform", "headless");
+            g_print("DEBUG: GPU headless mode (EGL)\n");
+        }
+    } else if (!has_display) {
         command_line->AppendSwitchWithValue("ozone-platform", "headless");
         command_line->AppendSwitchWithValue("headless", "new");
         command_line->AppendSwitch("disable-gpu");
         command_line->AppendSwitch("disable-gpu-compositing");
         command_line->AppendSwitch("disable-software-rasterizer");
-        g_print("DEBUG: Running in headless mode (no DISPLAY)\n");
+        g_print("DEBUG: CPU headless mode (no DISPLAY, no GPU)\n");
     }
 
     CefRefPtr<CefApp> app;
@@ -381,6 +411,8 @@ extern "C" {
  * Returns: TRUE on success, FALSE on failure
  */
 gboolean cef_browser_start(GstChromiumSrc *src, const gchar *url, gint width, gint height) {
+    gpu_ensure_config(src);
+
     if (!initialize_cef()) {
         return FALSE;
     }

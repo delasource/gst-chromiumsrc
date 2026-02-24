@@ -46,13 +46,13 @@ else
 	INSTALL_DIR = $(HOME)/.local/share/gstreamer-1.0/plugins
 endif
 
-SOURCES = gstchromiumsrc.cpp cef_render_handler.cpp
+SOURCES = gstchromiumsrc.cpp cef_render_handler.cpp gpu_utils.cpp
 
 .PHONY: all clean install
 
 all: $(PLUGIN)
 
-$(PLUGIN): $(SOURCES) gstchromiumsrc.h cef_render_handler.h
+$(PLUGIN): $(SOURCES) gstchromiumsrc.h cef_render_handler.h gpu_utils.h
 	g++ $(CXXFLAGS) -o $@ $(SOURCES) $(LDFLAGS)
 
 ifeq ($(UNAME_S),Darwin)
