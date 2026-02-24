@@ -305,16 +305,47 @@ static gboolean initialize_cef(void) {
     CefString(&settings.cache_path) = cache_dir;
     g_free(cache_dir);
 
+    const gchar *search_paths[] = {
+        g_getenv("CHROMIUMSRC_RESOURCES_PATH"),
+        g_getenv("GST_PLUGIN_PATH"),
+        "/usr/local/lib/gstreamer-1.0",
+        "/usr/lib/gstreamer-1.0",
+        "/usr/lib/x86_64-linux-gnu/gstreamer-1.0",
+        g_getenv("HOME") ? g_strdup_printf("%s/.local/share/gstreamer-1.0/plugins", g_getenv("HOME")) : NULL,
+        NULL
+    };
+
+    for (int i = 0; search_paths[i] != NULL; i++) {
+        gchar *resources_dir = g_strdup_printf("%s/Resources", search_paths[i]);
+        if (g_file_test(resources_dir, G_FILE_TEST_IS_DIR)) {
+            gchar *icu_file = g_strdup_printf("%s/icudtl.dat", resources_dir);
+            if (g_file_test(icu_file, G_FILE_TEST_EXISTS)) {
+                CefString(&settings.resources_dir_path) = resources_dir;
+                g_print("DEBUG: Using CEF resources from: %s\n", resources_dir);
+                g_free(icu_file);
+                g_free(resources_dir);
+                break;
+            }
+            g_free(icu_file);
+        }
+        g_free(resources_dir);
+    }
+
     CefRefPtr<CefCommandLine> command_line = CefCommandLine::CreateCommandLine();
-    //command_line->AppendSwitch("single-process");
-    //command_line->AppendSwitch("disable-gpu");
-    //command_line->AppendSwitch("disable-gpu-compositing");
-    //command_line->AppendSwitch("disable-software-rasterizer");
     command_line->AppendSwitch("disable-extensions");
     command_line->AppendSwitch("disable-sync");
     command_line->AppendSwitch("disable-background-networking");
     command_line->AppendSwitch("no-first-run");
     command_line->AppendSwitchWithValue("log-severity", "warning");
+
+    if (!g_getenv("DISPLAY")) {
+        command_line->AppendSwitchWithValue("ozone-platform", "headless");
+        command_line->AppendSwitchWithValue("headless", "new");
+        command_line->AppendSwitch("disable-gpu");
+        command_line->AppendSwitch("disable-gpu-compositing");
+        command_line->AppendSwitch("disable-software-rasterizer");
+        g_print("DEBUG: Running in headless mode (no DISPLAY)\n");
+    }
 
     CefRefPtr<CefApp> app;
 
