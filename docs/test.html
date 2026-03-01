@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>60 FPS Transparent Page</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            background: transparent; /* Essential for transparency */
+        }
+        .container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            /* This is a good trick to force hardware acceleration layers */
+            transform: translateZ(0);
+        }
+        .spinning-box {
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(45deg, #ff006e, #8338ec);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-top: -100px;
+            margin-left: -100px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            /* Use transform for smooth, GPU-accelerated animation */
+            animation: spin 2s linear infinite;
+        }
+        .fps-counter {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: rgb(255, 50, 0);
+            font-family: monospace;
+            font-size: 26px;
+            text-shadow: 1px 1px 2px black;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinning-box"></div>
+        <div class="fps-counter" id="fps">FPS: 0</div>
+    </div>
+
+    <script>
+        // Simple FPS counter to verify performance
+        let lastTime = performance.now();
+        let frames = 0;
+        const fpsElement = document.getElementById('fps');
+
+        function updateFPS() {
+            frames++;
+            const currentTime = performance.now();
+            if (currentTime >= lastTime + 1000) {
+                const fps = Math.round((frames * 1000) / (currentTime - lastTime));
+                fpsElement.textContent = `FPS: ${fps}`;
+                frames = 0;
+                lastTime = currentTime;
+            }
+            requestAnimationFrame(updateFPS);
+        }
+        requestAnimationFrame(updateFPS);
+    </script>
+</body>
+</html>
