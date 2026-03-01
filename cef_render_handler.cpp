@@ -397,6 +397,7 @@ static gboolean initialize_cef(void) {
     settings.windowless_rendering_enabled = TRUE;
     settings.log_severity = LOGSEVERITY_WARNING;
     settings.multi_threaded_message_loop = FALSE;
+    CefString(&settings.browser_subprocess_path) = "/usr/local/lib/chromiumsrc-subprocess";
 
     gchar *cache_dir = g_strdup_printf("/tmp/chromiumsrc-%d", getpid());
     g_mkdir_with_parents(cache_dir, 0700);
