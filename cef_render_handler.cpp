@@ -374,11 +374,15 @@ static gboolean initialize_cef(void) {
             command_line->AppendSwitch("disable-background-networking");
             command_line->AppendSwitch("no-first-run");
             
+            // Disable zygote to ensure all subprocesses go through OnBeforeChildProcessLaunch
+            //command_line->AppendSwitch("no-zygote");
+            
             // Security: disable GPU sandbox for headless rendering
             command_line->AppendSwitch("disable-gpu-sandbox");
             command_line->AppendSwitch("disable-seccomp-filter-sandbox");
             command_line->AppendSwitch("no-sandbox");
-            command_line->AppendSwitchWithValue("log-severity", "warning");
+            command_line->AppendSwitchWithValue("log-severity", "verbose"); // warning
+            command_line->AppendSwitchWithValue("v", "1"); // remove line
 
             // Handle single-process mode (used for debugging/easier deployment)
             if (single_process_mode) {
@@ -445,7 +449,12 @@ static gboolean initialize_cef(void) {
         void OnBeforeChildProcessLaunch(
             CefRefPtr<CefCommandLine> command_line) override {
 
-            DEBUG_LOG_CEF("OnBeforeChildProcessLaunch - Configuring subprocess command line");
+            //DEBUG_LOG_CEF("=== OnBeforeChildProcessLaunch CALLED ===");
+            //DEBUG_LOG_CEF("Subprocess path configured: /usr/local/lib/chromiumsrc-subprocess");
+
+            // Log the full command line we're about to pass
+            std::string cmd_str = command_line->GetCommandLineString().ToString();
+            DEBUG_LOG_CEF("Command line: %s", cmd_str.c_str());
 
             // Pass GPU-related switches to child processes
             gboolean has_display = g_getenv("DISPLAY") != NULL;
@@ -476,7 +485,8 @@ static gboolean initialize_cef(void) {
             command_line->AppendSwitch("disable-gpu-sandbox");
             command_line->AppendSwitch("disable-seccomp-filter-sandbox");
             command_line->AppendSwitch("no-sandbox");
-            command_line->AppendSwitchWithValue("log-severity", "warning");
+            command_line->AppendSwitchWithValue("log-severity", "verbose");
+            command_line->AppendSwitchWithValue("v", "1");
 
             DEBUG_LOG_CEF("OnBeforeChildProcessLaunch - Subprocess command line configured");
         }
@@ -487,6 +497,13 @@ static gboolean initialize_cef(void) {
     // Create CEF app instance
     CefMainArgs main_args;
     CefRefPtr<CefAppImpl> app = new CefAppImpl();
+
+    DEBUG_LOG_CEF("=== Environment Variables ===");
+    DEBUG_LOG_CEF("XDG_RUNTIME_DIR: %s", g_getenv("XDG_RUNTIME_DIR") ? g_getenv("XDG_RUNTIME_DIR") : "(not set)");
+    DEBUG_LOG_CEF("DBUS_SESSION_BUS_ADDRESS: %s", g_getenv("DBUS_SESSION_BUS_ADDRESS") ? g_getenv("DBUS_SESSION_BUS_ADDRESS") : "(not set)");
+    DEBUG_LOG_CEF("HOME: %s", g_getenv("HOME") ? g_getenv("HOME") : "(not set)");
+    DEBUG_LOG_CEF("XAUTHORITY: %s", g_getenv("XAUTHORITY") ? g_getenv("XAUTHORITY") : "(not set)");
+    DEBUG_LOG_CEF("=============================");
 
     // Handle subprocess execution in multi-process mode
     if (!single_process_mode) {
@@ -502,9 +519,11 @@ static gboolean initialize_cef(void) {
     CefSettings settings;
     settings.no_sandbox = TRUE;
     settings.windowless_rendering_enabled = TRUE;
-    settings.log_severity = LOGSEVERITY_WARNING;
+    settings.log_severity = LOGSEVERITY_VERBOSE;
     settings.multi_threaded_message_loop = FALSE;
     CefString(&settings.browser_subprocess_path) = "/usr/local/lib/chromiumsrc-subprocess";
+    //DEBUG_LOG_CEF("browser_subprocess_path set to: /usr/local/lib/chromiumsrc-subprocess");
+    //DEBUG_LOG_CEF("Subprocess file exists: %s", g_file_test("/usr/local/lib/chromiumsrc-subprocess", G_FILE_TEST_EXISTS) ? "YES" : "NO");
 
     // Create unique cache directory for this process
     gchar *cache_dir = g_strdup_printf("/tmp/chromiumsrc-%d", getpid());
