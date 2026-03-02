@@ -1,5 +1,6 @@
 #include "gstchromiumsrc.h"
 #include "cef_render_handler.h"
+#include "debug_utils.h"
 
 #include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
@@ -423,12 +424,14 @@ static gboolean gst_chromium_src_start(GstChromiumSrc *src) {
 
     GST_INFO_OBJECT(src, "Starting Chromium source: %s", src->url);
 
+    // Step 1: Validate URL
     if (!src->url) {
         GST_ELEMENT_ERROR(src, RESOURCE, SETTINGS,
             ("No URL specified"), (NULL));
         return FALSE;
     }
 
+    // Step 2: Allocate frame buffer
     src->frame_size = src->width * src->height * 4;
     src->frame_buffer = (guint8 *)g_malloc(src->frame_size);
     if (!src->frame_buffer) {
@@ -437,6 +440,7 @@ static gboolean gst_chromium_src_start(GstChromiumSrc *src) {
         return FALSE;
     }
 
+    // Step 3: Configure caps
     caps = gst_caps_new_simple("video/x-raw",
         "format", G_TYPE_STRING, "BGRA",
         "width", G_TYPE_INT, src->width,
@@ -448,10 +452,12 @@ static gboolean gst_chromium_src_start(GstChromiumSrc *src) {
     gst_app_src_set_caps(src->appsrc, caps);
     gst_caps_unref(caps);
 
+    // Step 4: Initialize state
     src->running = TRUE;
     src->frame_count = 0;
+    src->page_loaded = FALSE;
 
-	// Start the chromium (see other file)
+    // Step 5: Start CEF browser
     if (!cef_browser_start(src, src->url, src->width, src->height)) {
         GST_ELEMENT_ERROR(src,
 			RESOURCE,
@@ -484,19 +490,24 @@ static gboolean gst_chromium_src_start(GstChromiumSrc *src) {
 static gboolean gst_chromium_src_stop(GstChromiumSrc *src) {
     GST_INFO_OBJECT(src, "Stopping Chromium source");
 
+    // Step 1: Signal thread to stop
     g_mutex_lock(&src->frame_mutex);
     src->running = FALSE;
     g_cond_signal(&src->frame_cond);
     g_mutex_unlock(&src->frame_mutex);
 
+    // Step 2: Stop CEF browser
     cef_browser_stop(src);
 
+    // Step 3: Free frame buffer
     g_free(src->frame_buffer);
     src->frame_buffer = NULL;
     src->frame_size = 0;
 
+    // Step 4: Send EOS to appsrc
     if (src->appsrc) {
         gst_app_src_end_of_stream(src->appsrc);
+        DEBUG_LOG_GST("stop - EOS sent");
     }
 
     GST_INFO_OBJECT(src, "Chromium source stopped");
@@ -569,6 +580,11 @@ static GstStateChangeReturn gst_chromium_src_change_state(
  * Returns: TRUE on success, FALSE on failure
  */
 static gboolean plugin_init(GstPlugin *plugin) {
+    // Initialize debug system with unique instance ID
+    debug_init();
+    DEBUG_LOG("=== Chromium Source Plugin Initialized ===");
+    DEBUG_LOG("Plugin loaded - Instance ID: %s", debug_get_id());
+    
     return gst_element_register(plugin, "chromiumsrc", GST_RANK_NONE,
         GST_TYPE_CHROMIUM_SRC);
 }
