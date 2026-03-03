@@ -521,9 +521,37 @@ static gboolean initialize_cef(void) {
     settings.windowless_rendering_enabled = TRUE;
     settings.log_severity = LOGSEVERITY_VERBOSE;
     settings.multi_threaded_message_loop = FALSE;
-    CefString(&settings.browser_subprocess_path) = "/usr/local/lib/chromiumsrc-subprocess";
-    //DEBUG_LOG_CEF("browser_subprocess_path set to: /usr/local/lib/chromiumsrc-subprocess");
-    //DEBUG_LOG_CEF("Subprocess file exists: %s", g_file_test("/usr/local/lib/chromiumsrc-subprocess", G_FILE_TEST_EXISTS) ? "YES" : "NO");
+    
+    /**
+     * Subprocess Path Configuration
+     *
+     * CEF requires a separate executable to handle subprocesses (renderer, GPU, utility).
+     * We search multiple locations to support different installation scenarios:
+     *
+     * Search order:
+     *   1. CHROMIUMSRC_SUBPROCESS_PATH env var (for custom deployments)
+     *   2. /usr/local/lib/chromiumsrc-subprocess (system-wide install)
+     *   3. /usr/local/bin/chromiumsrc-subprocess (alternative system location)
+     *   4. ~/.local/share/gstreamer-1.0/plugins/chromiumsrc-subprocess (user install)
+     *
+     * The subprocess binary must be built separately using: make chromiumsrc-subprocess
+     * See main.cpp for the subprocess implementation.
+     */
+    const gchar *subprocess_paths[] = {
+        g_getenv("CHROMIUMSRC_SUBPROCESS_PATH"),
+        "/usr/local/lib/chromiumsrc-subprocess",
+        "/usr/local/bin/chromiumsrc-subprocess",
+        g_getenv("HOME") ? g_strdup_printf("%s/.local/share/gstreamer-1.0/plugins/chromiumsrc-subprocess", g_getenv("HOME")) : NULL,
+        NULL
+    };
+
+    for (int i = 0; subprocess_paths[i] != NULL; i++) {
+        if (g_file_test(subprocess_paths[i], G_FILE_TEST_EXISTS)) {
+            CefString(&settings.browser_subprocess_path) = subprocess_paths[i];
+            DEBUG_LOG_CEF("browser_subprocess_path: %s", subprocess_paths[i]);
+            break;
+        }
+    }
 
     // Create unique cache directory for this process
     gchar *cache_dir = g_strdup_printf("/tmp/chromiumsrc-%d", getpid());
