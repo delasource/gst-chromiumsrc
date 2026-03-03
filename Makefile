@@ -97,16 +97,19 @@ endif
 SOURCES = gstchromiumsrc.cpp cef_render_handler.cpp gpu_utils.cpp
 SUBPROCESS = chromiumsrc-subprocess
 
-.PHONY: all clean install
+.PHONY: all clean install cef-binaries
 
 # Build both the GStreamer plugin and the subprocess binary
-all: $(PLUGIN) $(SUBPROCESS)
+all: $(DIST_DIR)/$(PLUGIN) $(DIST_DIR)/$(SUBPROCESS)
+
+$(DIST_DIR):
+	mkdir -p $(DIST_DIR)
 
 # GStreamer Plugin Build Rule
 #
 # Builds the shared library that GStreamer loads as a source element.
 # This plugin initializes CEF and manages the browser lifecycle.
-$(PLUGIN): $(SOURCES) gstchromiumsrc.h cef_render_handler.h gpu_utils.h
+$(DIST_DIR)/$(PLUGIN): $(SOURCES) gstchromiumsrc.h cef_render_handler.h gpu_utils.h | $(DIST_DIR)
 	g++ $(CXXFLAGS) -o $@ $(SOURCES) $(LDFLAGS)
 
 # CEF Subprocess Binary Build Rule
@@ -117,27 +120,35 @@ $(PLUGIN): $(SOURCES) gstchromiumsrc.h cef_render_handler.h gpu_utils.h
 # to handle the subprocess logic.
 #
 # See main.cpp for detailed documentation of the subprocess architecture.
-$(SUBPROCESS): main.cpp
+$(DIST_DIR)/$(SUBPROCESS): main.cpp | $(DIST_DIR)
 	g++ -std=c++20 -O2 \
 		-I$(CEF_DIR) \
 		$(GLIB_CFLAGS) \
 		-o $@ main.cpp \
 		$(SUBPROCESS_LDFLAGS)
 
-install: $(PLUGIN) $(SUBPROCESS)
+# Copy CEF binaries to dist folder
+$(DIST_DIR)/.cef-copied: | $(DIST_DIR)
+	cp -r "$(CEF_DIR)/Resources/"* "$(DIST_DIR)/"
+	cp -r "$(CEF_DIR)/Release/"* "$(DIST_DIR)/"
+	touch $@
+
+cef-binaries: $(DIST_DIR)/.cef-copied
+
+install: $(DIST_DIR)/$(PLUGIN) $(DIST_DIR)/$(SUBPROCESS)
 	mkdir -p "$(INSTALL_DIR)"
-	cp $(PLUGIN) "$(INSTALL_DIR)/"
-	cp $(SUBPROCESS) "$(INSTALL_DIR)/"
+	cp $(DIST_DIR)/$(PLUGIN) "$(INSTALL_DIR)/"
+	cp $(DIST_DIR)/$(SUBPROCESS) "$(INSTALL_DIR)/"
 	cp -r "$(CEF_DIR)/Resources/"* "$(INSTALL_DIR)/"
 	cp -r "$(CEF_DIR)/Release/"* "$(INSTALL_DIR)/"
 
 # Clean Rule
 clean:
-	rm -f $(PLUGIN) $(SUBPROCESS)
+	rm -r $(DIST_DIR)
 
 # Test Rule
 #
 # Runs a basic test pipeline to verify the plugin works correctly.
 # Opens a test URL and displays it using autovideosink.
-test: $(PLUGIN)
-	GST_PLUGIN_PATH=. gst-launch-1.0 chromiumsrc url="https://pingup.de/w/png-test.html" width=1920 height=1080 ! videoconvert ! autovideosink
+test: $(DIST_DIR)/$(PLUGIN)
+	GST_PLUGIN_PATH=$(DIST_DIR) gst-launch-1.0 chromiumsrc url="https://pingup.de/w/png-test.html" width=1920 height=1080 ! videoconvert ! autovideosink
