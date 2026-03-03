@@ -104,9 +104,5 @@ int main(int argc, char* argv[]) {
     CefRefPtr<CefSubprocessApp> app = new CefSubprocessApp();
     
     int exit_code = CefExecuteProcess(main_args, app, nullptr);
-    if (exit_code >= 0) {
-        return exit_code;
-    }
-    
-    return 0;
+    return exit_code;
 }
