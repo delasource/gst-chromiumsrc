@@ -448,7 +448,10 @@ static gboolean initialize_cef()
             command_line->AppendSwitch("disable-seccomp-filter-sandbox");
             command_line->AppendSwitch("no-sandbox");
 
-            gboolean has_display = g_getenv("DISPLAY") != nullptr;
+            const gchar* display = g_getenv("DISPLAY");
+            gboolean has_display = display != nullptr && 
+                                   g_strcmp0(display, "NULL") != 0 &&
+                                   strlen(display) > 0;
             gboolean should_enable_gpu = (gpu_config && gpu_config->enabled) ||
                 (!gpu_config && gpu_is_available());
 
@@ -503,7 +506,10 @@ static gboolean initialize_cef()
         {
             std::string cmd_str = command_line->GetCommandLineString().ToString();
 
-            gboolean has_display = g_getenv("DISPLAY") != NULL;
+            const gchar* display = g_getenv("DISPLAY");
+            gboolean has_display = display != NULL &&
+                                   g_strcmp0(display, "NULL") != 0 &&
+                                   strlen(display) > 0;
             gboolean should_enable_gpu = (gpu_config && gpu_config->enabled) ||
                 (!gpu_config && gpu_is_available());
 

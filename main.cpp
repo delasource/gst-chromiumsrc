@@ -29,6 +29,7 @@
 #include <include/cef_command_line.h>
 #include <glib.h>
 #include <string>
+#include <cstring>
 
 /**
  * CefSubprocessApp - CEF application handler for subprocess execution
@@ -79,9 +80,13 @@ public:
         command_line->AppendSwitch("disable-seccomp-filter-sandbox");
         command_line->AppendSwitch("no-sandbox");
 
-        gboolean has_display = g_getenv("DISPLAY") != NULL;
+        const gchar* display = g_getenv("DISPLAY");
+        gboolean has_display = display != NULL && 
+                               g_strcmp0(display, "NULL") != 0 &&
+                               strlen(display) > 0;
         if (!has_display)
         {
+            g_print("[%s] No valid DISPLAY, using headless mode\n", process_type_.c_str());
             command_line->AppendSwitchWithValue("ozone-platform", "headless");
             command_line->AppendSwitchWithValue("headless", "new");
         }

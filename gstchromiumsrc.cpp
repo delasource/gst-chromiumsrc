@@ -8,6 +8,9 @@
 GST_DEBUG_CATEGORY_STATIC(chromium_src_debug);
 #define GST_CAT_DEFAULT chromium_src_debug
 
+//gst-launch-1.0 chromiumsrc url="https://pingup.de/w/png-test.html" ! videoconvert ! x264enc tune=zerolatency ! video/x-h264, profile=high ! mpegtsmux ! srtsink uri="srt://png.ninja:8890?streamid=publish:inproc&user=user&pass=npfa5php&pkt_size=1316"
+//gst-launch-1.0 chromiumsrc url="https://pingup.de/w/png-test.html" ! videoconvert ! queue ! x264enc tune=zerolatency ! video/x-h264, profile=high ! mpegtsmux ! srtsink uri="srt://localhost:8890?streamid=publish:inproc:dela_rs:j1olzl7o&pktsize=1316" latency=2000 sync=false async=false
+
 enum {
     PROP_0,
     PROP_URL,
