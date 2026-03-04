@@ -30,6 +30,7 @@
 #include <glib.h>
 #include <string>
 #include <cstring>
+#include "gpu_utils.h"
 
 /**
  * CefSubprocessApp - CEF application handler for subprocess execution
@@ -71,6 +72,7 @@ public:
     {
         process_type_ = process_type.ToString();
         g_print("[%s] Subprocess starting\n", process_type_.c_str());
+        //g_print("[%s] Initial command line: %s\n", process_type_.c_str(), command_line->GetCommandLineString().ToString().c_str());
 
         command_line->AppendSwitch("disable-extensions");
         command_line->AppendSwitch("disable-sync");
@@ -84,12 +86,36 @@ public:
         gboolean has_display = display != NULL && 
                                g_strcmp0(display, "NULL") != 0 &&
                                strlen(display) > 0;
+
+        /*
+        gboolean should_enable_gpu = gpu_is_available();
+        g_print("[%s] GPU available check: %d\n", process_type_.c_str(), should_enable_gpu);
+
+        if (should_enable_gpu)
+        {
+            g_print("[%s] Disabling GPU, using software compositing\n", process_type_.c_str());
+            command_line->AppendSwitch("disable-gpu");
+            command_line->AppendSwitch("disable-software-rasterizer");
+            command_line->AppendSwitchWithValue("num-raster-threads", "4");
+        }
+        else
+        {
+            g_print("[%s] Setting use-gl=swiftshader\n", process_type_.c_str());
+            command_line->AppendSwitchWithValue("use-gl", "swiftshader");
+            command_line->AppendSwitch("disable-gpu");
+            command_line->AppendSwitch("in-process-gpu");
+        }
+        */
+
         if (!has_display)
         {
             g_print("[%s] No valid DISPLAY, using headless mode\n", process_type_.c_str());
             command_line->AppendSwitchWithValue("ozone-platform", "headless");
             command_line->AppendSwitchWithValue("headless", "new");
         }
+        
+        g_print("[%s] Final command line: %s\n", process_type_.c_str(),
+                command_line->GetCommandLineString().ToString().c_str());
     }
 
     IMPLEMENT_REFCOUNTING(CefSubprocessApp);

@@ -75,11 +75,11 @@ $(PLUGIN): $(SOURCES) gstchromiumsrc.h cef_render_handler.h gpu_utils.h
 #
 # See main.cpp for detailed documentation of the subprocess architecture.
 
-$(SUBPROCESS): main.cpp
+$(SUBPROCESS): main.cpp gpu_utils.cpp gpu_utils.h
 	g++ -std=c++20 -O2 \
 		-I$(CEF_DIR) \
 		$(GLIB_CFLAGS) \
-		-o $@ main.cpp \
+		-o $@ main.cpp gpu_utils.cpp \
 		$(SUBPROCESS_LDFLAGS)
 
 install: $(PLUGIN) $(SUBPROCESS)

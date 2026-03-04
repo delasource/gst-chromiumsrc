@@ -457,6 +457,10 @@ static gboolean initialize_cef()
 
             if (should_enable_gpu)
             {
+                //DEBUG_LOG_GL("OnBeforeChildProcessLaunch - Disabling GPU, using software compositing");
+                //command_line->AppendSwitch("disable-gpu");
+                //command_line->AppendSwitch("disable-software-rasterizer");
+                //command_line->AppendSwitchWithValue("num-raster-threads", "4");
                 command_line->AppendSwitchWithValue("use-gl", "egl-angle");
                 command_line->AppendSwitchWithValue("use-angle", "egl");
                 command_line->AppendSwitch("enable-gpu-rasterization");
@@ -504,7 +508,7 @@ static gboolean initialize_cef()
          */
         void OnBeforeChildProcessLaunch(CefRefPtr<CefCommandLine> command_line) override
         {
-            std::string cmd_str = command_line->GetCommandLineString().ToString();
+            //DEBUG_LOG_GL("OnBeforeChildProcessLaunch - Initial: %s", command_line->GetCommandLineString().ToString().c_str());
 
             const gchar* display = g_getenv("DISPLAY");
             gboolean has_display = display != NULL &&
@@ -513,12 +517,17 @@ static gboolean initialize_cef()
             gboolean should_enable_gpu = (gpu_config && gpu_config->enabled) ||
                 (!gpu_config && gpu_is_available());
 
+
             if (should_enable_gpu)
             {
                 command_line->AppendSwitchWithValue("use-gl", "egl-angle");
                 command_line->AppendSwitchWithValue("use-angle", "egl");
                 command_line->AppendSwitch("enable-gpu-rasterization");
                 command_line->AppendSwitch("ignore-gpu-blocklist");
+                //DEBUG_LOG_GL("OnBeforeCommandLineProcessing - Disabling GPU, using software compositing");
+                //command_line->AppendSwitch("disable-gpu");
+                //command_line->AppendSwitch("disable-software-rasterizer");
+                //command_line->AppendSwitchWithValue("num-raster-threads", "4");
 
                 if (!has_display)
                 {
@@ -542,7 +551,8 @@ static gboolean initialize_cef()
             command_line->AppendSwitch("disable-seccomp-filter-sandbox");
             command_line->AppendSwitch("no-sandbox");
 
-            std::string final_cmd = command_line->GetCommandLineString().ToString();
+            DEBUG_LOG_GL("OnBeforeChildProcessLaunch - Final: %s", 
+                         command_line->GetCommandLineString().ToString().c_str());
         }
 
         IMPLEMENT_REFCOUNTING(CefAppImpl);
