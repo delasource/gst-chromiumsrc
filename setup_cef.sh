@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-CEF_VERSION="145.0.26%2Bg6ed7554%2Bchromium-145.0.7632.110"
+CEF_VERSION="145.0.27%2Bg4ddda2e%2Bchromium-145.0.7632.117"
+#CEF_VERSION="145.0.26%2Bg6ed7554%2Bchromium-145.0.7632.110"
 CEF_DIR="third_party/cef"
 BUILD_DIR="build_cef_wrapper"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -218,7 +219,12 @@ build_wrapper() {
     fi
     
     make libcef_dll_wrapper -j"$NPROC"
-    
+
+    # Move file to cef/Release dir
+    mkdir -p ../third_party/cef/Release
+    rm -f ../third_party/cef/Release/libcef_dll_wrapper.a
+    cp libcef_dll_wrapper/libcef_dll_wrapper.a ../third_party/cef/Release/
+
     cd "$SCRIPT_DIR"
     
     echo "CEF wrapper built successfully"

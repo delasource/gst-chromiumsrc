@@ -305,13 +305,11 @@ static gpointer cef_message_loop_thread(gpointer data) {
     GstChromiumSrc *src = (GstChromiumSrc *)data;
     int count = 0;
 
-    DEBUG_LOG_CEF("message_loop_thread - Thread started (tid=%d)", gettid());
-
     while (src->running) {
         CefDoMessageLoopWork();
         count++;
-        if (count % 60 == 0) {
-            DEBUG_LOG_CEF("message_loop - Iteration #%d (page_loaded=%d, browser=%p)", 
+        if (count % 300 == 0) {
+            DEBUG_LOG_CEF("message_loop running (5s interval ping) Iteration #%d (page_loaded=%d, browser=%p)",
                     count, src->page_loaded, src->cef_browser);
         }
 
@@ -328,10 +326,6 @@ static gpointer cef_message_loop_thread(gpointer data) {
 
 /**
  * initialize_cef:
- *
- * Initializes the CEF framework. Sets up single-process mode with
- * windowless rendering disabled GPU acceleration. Uses thread-safe
- * initialization to prevent multiple calls.
  *
  * Invoked by cef_browser_start() before creating a browser instance.
  * Safe to call multiple times; subsequent calls are no-ops.
@@ -364,9 +358,7 @@ static gboolean initialize_cef(void) {
          * Called before CEF processes command line arguments.
          * This is where we inject Chromium flags for GPU/headless modes.
          */
-        void OnBeforeCommandLineProcessing(
-            const CefString& process_type,
-            CefRefPtr<CefCommandLine> command_line) override {
+        void OnBeforeCommandLineProcessing(const CefString& process_type, CefRefPtr<CefCommandLine> command_line) override {
 
             // Disable unnecessary features for headless rendering
             command_line->AppendSwitch("disable-extensions");
@@ -384,36 +376,21 @@ static gboolean initialize_cef(void) {
             command_line->AppendSwitchWithValue("log-severity", "verbose"); // warning
             command_line->AppendSwitchWithValue("v", "1"); // remove line
 
-            // Handle single-process mode (used for debugging/easier deployment)
-            if (single_process_mode) {
-                command_line->AppendSwitch("single-process");
-                command_line->AppendSwitch("disable-zygote");
-                command_line->AppendSwitch("in-process-gpu");
-            }
+                command_line->AppendSwitchWithValue("use-gl", "egl-angle");
+                command_line->AppendSwitchWithValue("use-angle", "egl");
 
             // Determine GPU mode based on config and environment
-            gboolean has_display = g_getenv("DISPLAY") != NULL;
-            gboolean should_enable_gpu = (gpu_config && gpu_config->enabled) || 
+            gboolean has_display = false;// g_getenv("DISPLAY") != NULL;
+            gboolean should_enable_gpu = (gpu_config && gpu_config->enabled) ||
                                           (!gpu_config && gpu_is_available());
 
             if (should_enable_gpu) {
-                // GPU-accelerated rendering path
-                if (gpu_config && gpu_config->device_path) {
-                    DEBUG_LOG_GL("OnBeforeCommandLineProcessing - GPU device: %s", 
-                            gpu_config->device_path);
-                } else {
-                    DEBUG_LOG_GL("OnBeforeCommandLineProcessing - GPU device: subprocess auto-detect");
-                }
-                
                 // GL implementation selection
-                command_line->AppendSwitchWithValue("use-gl", "egl-angle");
-                command_line->AppendSwitchWithValue("use-angle", "egl");
                 command_line->AppendSwitch("enable-gpu-rasterization");
                 command_line->AppendSwitch("enable-zero-copy");
                 command_line->AppendSwitch("ignore-gpu-blocklist");
 
                 if (!has_display) {
-                    DEBUG_LOG_GL("OnBeforeCommandLineProcessing - Headless GPU mode (no DISPLAY)");
                     command_line->AppendSwitchWithValue("ozone-platform", "headless");
                     command_line->AppendSwitchWithValue("headless", "new");
                 } else {
@@ -421,7 +398,6 @@ static gboolean initialize_cef(void) {
                 }
             } else if (!has_display) {
                 // CPU-only headless rendering path
-                DEBUG_LOG_GL("OnBeforeCommandLineProcessing - CPU headless mode (no DISPLAY, no GPU)");
                 command_line->AppendSwitchWithValue("ozone-platform", "headless");
                 command_line->AppendSwitchWithValue("headless", "new");
                 command_line->AppendSwitch("disable-gpu");
@@ -446,11 +422,7 @@ static gboolean initialize_cef(void) {
          *
          * Without this, subprocesses get gl=none,angle=none and fail to initialize.
          */
-        void OnBeforeChildProcessLaunch(
-            CefRefPtr<CefCommandLine> command_line) override {
-
-            //DEBUG_LOG_CEF("=== OnBeforeChildProcessLaunch CALLED ===");
-            //DEBUG_LOG_CEF("Subprocess path configured: /usr/local/lib/chromiumsrc-subprocess");
+        void OnBeforeChildProcessLaunch(CefRefPtr<CefCommandLine> command_line) override {
 
             // Log the full command line we're about to pass
             std::string cmd_str = command_line->GetCommandLineString().ToString();
@@ -462,19 +434,16 @@ static gboolean initialize_cef(void) {
                                           (!gpu_config && gpu_is_available());
 
             if (should_enable_gpu) {
-                DEBUG_LOG_GL("OnBeforeChildProcessLaunch - Adding GL switches for GPU subprocess");
                 command_line->AppendSwitchWithValue("use-gl", "egl-angle");
                 command_line->AppendSwitchWithValue("use-angle", "egl");
                 command_line->AppendSwitch("enable-gpu-rasterization");
                 command_line->AppendSwitch("ignore-gpu-blocklist");
 
                 if (!has_display) {
-                    DEBUG_LOG_GL("OnBeforeChildProcessLaunch - Adding headless switches");
                     command_line->AppendSwitchWithValue("ozone-platform", "headless");
                     command_line->AppendSwitchWithValue("headless", "new");
                 }
             } else if (!has_display) {
-                DEBUG_LOG_GL("OnBeforeChildProcessLaunch - Adding CPU headless switches");
                 command_line->AppendSwitchWithValue("ozone-platform", "headless");
                 command_line->AppendSwitchWithValue("headless", "new");
                 command_line->AppendSwitch("disable-gpu");
@@ -487,8 +456,6 @@ static gboolean initialize_cef(void) {
             command_line->AppendSwitch("no-sandbox");
             command_line->AppendSwitchWithValue("log-severity", "verbose");
             command_line->AppendSwitchWithValue("v", "1");
-
-            DEBUG_LOG_CEF("OnBeforeChildProcessLaunch - Subprocess command line configured");
         }
 
         IMPLEMENT_REFCOUNTING(CefAppImpl);
@@ -528,28 +495,29 @@ static gboolean initialize_cef(void) {
      * CEF requires a separate executable to handle subprocesses (renderer, GPU, utility).
      * We search multiple locations to support different installation scenarios:
      *
-     * Search order:
-     *   1. CHROMIUMSRC_SUBPROCESS_PATH env var (for custom deployments)
-     *   2. /usr/local/lib/chromiumsrc-subprocess (system-wide install)
-     *   3. /usr/local/bin/chromiumsrc-subprocess (alternative system location)
-     *   4. ~/.local/share/gstreamer-1.0/plugins/chromiumsrc-subprocess (user install)
-     *
      * The subprocess binary must be built separately using: make chromiumsrc-subprocess
      * See main.cpp for the subprocess implementation.
      */
     const gchar *subprocess_paths[] = {
-        g_getenv("CHROMIUMSRC_SUBPROCESS_PATH"),
+        g_getenv("CHROMIUMSRC_SUBPROCESS_PATH") ? g_getenv("CHROMIUMSRC_SUBPROCESS_PATH") : "skip",
+        g_getenv("HOME") ? g_strdup_printf("%s/.local/share/gstreamer-1.0/plugins/chromiumsrc-subprocess", g_getenv("HOME")) : "skip",
         "/usr/local/lib/chromiumsrc-subprocess",
         "/usr/local/bin/chromiumsrc-subprocess",
-        g_getenv("HOME") ? g_strdup_printf("%s/.local/share/gstreamer-1.0/plugins/chromiumsrc-subprocess", g_getenv("HOME")) : NULL,
         NULL
     };
 
     for (int i = 0; subprocess_paths[i] != NULL; i++) {
+        if (g_strcmp0(subprocess_paths[i], "skip") == 0) {
+            continue;
+        }
         if (g_file_test(subprocess_paths[i], G_FILE_TEST_EXISTS)) {
             CefString(&settings.browser_subprocess_path) = subprocess_paths[i];
-            DEBUG_LOG_CEF("browser_subprocess_path: %s", subprocess_paths[i]);
+            DEBUG_LOG_CEF("initialize_cef - browser_subprocess_path: %s", subprocess_paths[i]);
             break;
+        }
+        else
+        {
+            DEBUG_LOG_CEF("initialize_cef - subprocess path not found: %s", subprocess_paths[i]);
         }
     }
 
@@ -562,16 +530,19 @@ static gboolean initialize_cef(void) {
 
     // Search for CEF resources (locales, ICU data, etc.)
     const gchar *search_paths[] = {
-        g_getenv("CHROMIUMSRC_RESOURCES_PATH"),
-        g_getenv("GST_PLUGIN_PATH"),
+        g_getenv("CHROMIUMSRC_RESOURCES_PATH") ? g_getenv("CHROMIUMSRC_RESOURCES_PATH") : "skip",
+        g_getenv("GST_PLUGIN_PATH") ? g_strdup_printf("%s/gstreamer-1.0", g_getenv("GST_PLUGIN_PATH")) : "skip",
+        g_getenv("HOME") ? g_strdup_printf("%s/.local/share/gstreamer-1.0/plugins", g_getenv("HOME")) : "skip",
         "/usr/local/lib/gstreamer-1.0",
         "/usr/lib/gstreamer-1.0",
         "/usr/lib/x86_64-linux-gnu/gstreamer-1.0",
-        g_getenv("HOME") ? g_strdup_printf("%s/.local/share/gstreamer-1.0/plugins", g_getenv("HOME")) : NULL,
         NULL
     };
 
     for (int i = 0; search_paths[i] != NULL; i++) {
+        if (g_strcmp0(search_paths[i], "skip") == 0) {
+            continue;
+        }
         gchar *resources_dir = g_strdup_printf("%s/Resources", search_paths[i]);
         if (g_file_test(resources_dir, G_FILE_TEST_IS_DIR)) {
             gchar *icu_file = g_strdup_printf("%s/icudtl.dat", resources_dir);
@@ -632,18 +603,14 @@ gboolean cef_browser_start(GstChromiumSrc *src, const gchar *url, gint width, gi
     src->page_loaded = FALSE;
 
     // Step 3: Create CEF handlers
-    CefRefPtr<CefRenderHandlerImpl> render_handler =
-        new CefRenderHandlerImpl(src, width, height);
+    CefRefPtr<CefRenderHandlerImpl> render_handler = new CefRenderHandlerImpl(src, width, height);
 
-    CefRefPtr<CefLoadHandlerImpl> load_handler =
-        new CefLoadHandlerImpl(src);
+    CefRefPtr<CefLoadHandlerImpl> load_handler = new CefLoadHandlerImpl(src);
 
-    CefRefPtr<CefLifeSpanHandlerImpl> lifespan_handler =
-        new CefLifeSpanHandlerImpl(src);
+    CefRefPtr<CefLifeSpanHandlerImpl> lifespan_handler = new CefLifeSpanHandlerImpl(src);
 
     // Step 4: Create CEF client
-    CefRefPtr<CefClientImpl> client =
-        new CefClientImpl(render_handler, load_handler, lifespan_handler);
+    CefRefPtr<CefClientImpl> client = new CefClientImpl(render_handler, load_handler, lifespan_handler);
 
     // Step 5: Configure windowless rendering
     CefWindowInfo window_info;

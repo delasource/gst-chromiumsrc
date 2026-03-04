@@ -102,6 +102,11 @@ public:
 int main(int argc, char* argv[]) {
     CefMainArgs main_args(argc, argv);
     CefRefPtr<CefSubprocessApp> app = new CefSubprocessApp();
+
+	// Log build time
+	g_print("=====================\n");
+    g_print("CEF Subprocess Binary - Build Time: %s %s\n", __DATE__, __TIME__);
+    g_print("=====================\n");
     
     int exit_code = CefExecuteProcess(main_args, app, nullptr);
     return exit_code;
