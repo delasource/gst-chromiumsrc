@@ -73,13 +73,13 @@ $(PLUGIN): $(SOURCES) gstchromiumsrc.h cef_render_handler.h gpu_utils.h
 # with special command-line flags. The binary then calls CefExecuteProcess()
 # to handle the subprocess logic.
 #
-# See main.cpp for detailed documentation of the subprocess architecture.
+# See subprocess_main.cpp for detailed documentation of the subprocess architecture.
 
-$(SUBPROCESS): main.cpp gpu_utils.cpp gpu_utils.h
+$(SUBPROCESS): subprocess_main.cpp gpu_utils.cpp gpu_utils.h
 	g++ -std=c++20 -O2 \
 		-I$(CEF_DIR) \
 		$(GLIB_CFLAGS) \
-		-o $@ main.cpp gpu_utils.cpp \
+		-o $@ subprocess_main.cpp gpu_utils.cpp \
 		$(SUBPROCESS_LDFLAGS)
 
 install: $(PLUGIN) $(SUBPROCESS)

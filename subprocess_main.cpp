@@ -1,5 +1,5 @@
 /**
- * main.cpp - CEF Subprocess Binary for Chromium Multi-Process Architecture
+ * subprocess_main.cpp - CEF Subprocess Binary for Chromium Multi-Process Architecture
  *
  * Purpose:
  *   CEF uses a multi-process architecture where the main browser process spawns
