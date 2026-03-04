@@ -1,10 +1,13 @@
 # Writing a GStreamer Source Plugin
 
-This guide describes how to write a custom GStreamer source plugin for pushing image or video data into a pipeline. It covers the essential APIs, required callbacks, and the structure of a minimal but complete source element.
+This guide describes how to write a custom GStreamer source plugin for pushing image or video data into a pipeline. It
+covers the essential APIs, required callbacks, and the structure of a minimal but complete source element.
 
 ## Overview
 
-A source plugin in GStreamer is an element that produces data for the pipeline. It has no sink pads—only source pads. For file-based or data-producing sources, you typically subclass `GstPushSrc` (which itself inherits from `GstBaseSrc` → `GstElement` → `GstObject`).
+A source plugin in GStreamer is an element that produces data for the pipeline. It has no sink pads—only source pads.
+For file-based or data-producing sources, you typically subclass `GstPushSrc` (which itself inherits from `GstBaseSrc` →
+`GstElement` → `GstObject`).
 
 ### Class Hierarchy
 
@@ -18,8 +21,10 @@ GObject
                                 ╰── YourSource
 ```
 
-- **GstBaseSrc**: Base class for source elements. Handles state changes, seeking, and provides virtual methods for the core functionality.
-- **GstPushSrc**: Subclass of GstBaseSrc that implements a push-based source. You implement the `create()` method to produce buffers.
+- **GstBaseSrc**: Base class for source elements. Handles state changes, seeking, and provides virtual methods for the
+  core functionality.
+- **GstPushSrc**: Subclass of GstBaseSrc that implements a push-based source. You implement the `create()` method to
+  produce buffers.
 
 ## Plugin Structure
 
@@ -35,27 +40,28 @@ A minimal source plugin consists of:
 
 ### GstBaseSrc Methods
 
-| Method | Required | Purpose |
-|--------|----------|---------|
-| `start()` | Recommended | Initialize resources (open file, allocate buffers) |
-| `stop()` | Recommended | Clean up resources (close file, free memory) |
-| `get_size()` | Optional | Return total stream size in bytes (enables seeking) |
-| `is_seekable()` | Optional | Return `TRUE` if the source supports seeking |
-| `do_seek()` | Optional* | Handle seek requests (required if `is_seekable` returns TRUE) |
-| `query()` | Optional | Handle queries (position, duration, etc.) |
-| `event()` | Optional | Handle events (flush, seek, etc.) |
+| Method          | Required    | Purpose                                                       |
+|-----------------|-------------|---------------------------------------------------------------|
+| `start()`       | Recommended | Initialize resources (open file, allocate buffers)            |
+| `stop()`        | Recommended | Clean up resources (close file, free memory)                  |
+| `get_size()`    | Optional    | Return total stream size in bytes (enables seeking)           |
+| `is_seekable()` | Optional    | Return `TRUE` if the source supports seeking                  |
+| `do_seek()`     | Optional*   | Handle seek requests (required if `is_seekable` returns TRUE) |
+| `query()`       | Optional    | Handle queries (position, duration, etc.)                     |
+| `event()`       | Optional    | Handle events (flush, seek, etc.)                             |
 
 ### GstPushSrc Methods
 
-| Method | Required | Purpose |
-|--------|----------|---------|
-| `create()` | **Yes** | Create and push the next buffer |
-| `alloc()` | Optional | Pre-allocate buffer (rarely needed) |
-| `fill()` | Optional | Fill an allocated buffer (alternative to create) |
+| Method     | Required | Purpose                                          |
+|------------|----------|--------------------------------------------------|
+| `create()` | **Yes**  | Create and push the next buffer                  |
+| `alloc()`  | Optional | Pre-allocate buffer (rarely needed)              |
+| `fill()`   | Optional | Fill an allocated buffer (alternative to create) |
 
 ## Pad Templates
 
-Every source element must define at least one source pad template. This tells GStreamer what kind of data the element can produce.
+Every source element must define at least one source pad template. This tells GStreamer what kind of data the element
+can produce.
 
 ```c
 static GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE(
@@ -174,14 +180,14 @@ static GstFlowReturn gst_my_src_create(GstPushSrc *pushsrc, GstBuffer **buffer) 
 
 ### GstFlowReturn Values
 
-| Value | Meaning |
-|-------|---------|
-| `GST_FLOW_OK` | Success, buffer produced |
-| `GST_FLOW_EOS` | End of stream reached |
-| `GST_FLOW_ERROR` | Generic error |
+| Value                     | Meaning                   |
+|---------------------------|---------------------------|
+| `GST_FLOW_OK`             | Success, buffer produced  |
+| `GST_FLOW_EOS`            | End of stream reached     |
+| `GST_FLOW_ERROR`          | Generic error             |
 | `GST_FLOW_NOT_NEGOTIATED` | Format negotiation failed |
-| `GST_FLOW_FLUSHING` | Element is shutting down |
-| `GST_FLOW_NOT_SUPPORTED` | Operation not supported |
+| `GST_FLOW_FLUSHING`       | Element is shutting down  |
+| `GST_FLOW_NOT_SUPPORTED`  | Operation not supported   |
 
 ## Creating Buffers
 
@@ -330,6 +336,7 @@ static gboolean gst_my_src_start(GstBaseSrc *basesrc) {
 ```
 
 Live sources:
+
 - Cannot be paused (transition to READY instead of PAUSED)
 - Use `GST_FORMAT_TIME` for timing
 - May need to handle latency with `gst_base_src_set_latency()`
@@ -345,6 +352,7 @@ static gboolean plugin_init(GstPlugin *plugin) {
 ```
 
 The rank determines plugin priority when autoplugging:
+
 - `GST_RANK_NONE` (0): Never use automatically
 - `GST_RANK_MARGINAL` (64): Use as fallback
 - `GST_RANK_SECONDARY` (128): Prefer over marginal
@@ -380,6 +388,7 @@ libgstmysrc.so: mysrc.c
 ```
 
 Required flags:
+
 - `-shared -fPIC`: Build as shared library
 - `-DPACKAGE`: Required by `GST_PLUGIN_DEFINE`
 - `-DPACKAGE_VERSION`: Required by `GST_PLUGIN_DEFINE`
@@ -577,6 +586,7 @@ GST_ERROR_OBJECT(src, "Failed to read: %s", error);
 ```
 
 Enable in code:
+
 ```c
 GST_DEBUG_CATEGORY_STATIC(my_src_debug);
 #define GST_CAT_DEFAULT my_src_debug
