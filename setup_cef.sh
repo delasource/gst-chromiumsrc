@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-CEF_VERSION="145.0.27%2Bg4ddda2e%2Bchromium-145.0.7632.117"
+CEF_VERSION="121.3.15%2Bg4d3b0b4%2Bchromium-121.0.6167.184"
+#CEF_VERSION="145.0.27%2Bg4ddda2e%2Bchromium-145.0.7632.117"
 #CEF_VERSION="145.0.26%2Bg6ed7554%2Bchromium-145.0.7632.110"
 CEF_DIR="third_party/cef"
 BUILD_DIR="build_cef_wrapper"

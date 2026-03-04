@@ -28,6 +28,7 @@
 #include <include/cef_app.h>
 #include <include/cef_command_line.h>
 #include <glib.h>
+#include <string>
 
 /**
  * CefSubprocessApp - CEF application handler for subprocess execution
@@ -41,26 +42,34 @@
  *   - Disable sandboxing and GPU sandbox for containerized environments
  *   - Disable unnecessary features (extensions, sync, background networking)
  */
-class CefSubprocessApp : public CefApp, public CefBrowserProcessHandler {
+class CefSubprocessApp : public CefApp
+{
 public:
-    CefSubprocessApp() {}
+    CefSubprocessApp() : process_type_("unknown")
+    {
+    }
+
+    std::string GetProcessType() const { return process_type_; }
 
     /**
-     * OnBeforeCommandLineProcessing:
-     * @process_type: Type of subprocess (renderer, gpu-process, utility, etc.)
-     * @command_line: The command line to modify before subprocess starts
-     *
-     * Configures Chromium command line switches for the subprocess.
-     * Called by CEF before spawning each subprocess type.
-     *
-     * Applied flags:
-     *   - Security: disable-gpu-sandbox, disable-seccomp-filter-sandbox, no-sandbox
-     *   - Performance: disable-extensions, disable-sync, disable-background-networking
-     *   - Headless: ozone-platform=headless, headless=new (when no DISPLAY)
-     */
+         * OnBeforeCommandLineProcessing:
+         * @process_type: Type of subprocess (renderer, gpu-process, utility, etc.)
+         * @command_line: The command line to modify before subprocess starts
+         *
+         * Configures Chromium command line switches for the subprocess.
+         * Called by CEF before spawning each subprocess type.
+         *
+         * Applied flags:
+         *   - Security: disable-gpu-sandbox, disable-seccomp-filter-sandbox, no-sandbox
+         *   - Performance: disable-extensions, disable-sync, disable-background-networking
+         *   - Headless: ozone-platform=headless, headless=new (when no DISPLAY)
+         */
     void OnBeforeCommandLineProcessing(
         const CefString& process_type,
-        CefRefPtr<CefCommandLine> command_line) override {
+        CefRefPtr<CefCommandLine> command_line) override
+    {
+        process_type_ = process_type.ToString();
+        g_print("[%s] Subprocess starting\n", process_type_.c_str());
 
         command_line->AppendSwitch("disable-extensions");
         command_line->AppendSwitch("disable-sync");
@@ -71,17 +80,17 @@ public:
         command_line->AppendSwitch("no-sandbox");
 
         gboolean has_display = g_getenv("DISPLAY") != NULL;
-        if (!has_display) {
+        if (!has_display)
+        {
             command_line->AppendSwitchWithValue("ozone-platform", "headless");
             command_line->AppendSwitchWithValue("headless", "new");
         }
     }
 
-    CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override {
-        return this;
-    }
-
     IMPLEMENT_REFCOUNTING(CefSubprocessApp);
+
+private:
+    std::string process_type_;
 };
 
 /**
@@ -99,15 +108,22 @@ public:
  *
  * Returns: Exit code from subprocess execution, or 0 if main process
  */
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[])
+{
     CefMainArgs main_args(argc, argv);
     CefRefPtr<CefSubprocessApp> app = new CefSubprocessApp();
 
-	// Log build time
-	g_print("=====================\n");
+    g_print("=====================\n");
     g_print("CEF Subprocess Binary - Build Time: %s %s\n", __DATE__, __TIME__);
     g_print("=====================\n");
-    
+
     int exit_code = CefExecuteProcess(main_args, app, nullptr);
+
+    if (exit_code >= 0)
+    {
+        g_print("[%s] CefExecuteProcess returned: %d\n",
+                app->GetProcessType().c_str(), exit_code);
+    }
+
     return exit_code;
 }
