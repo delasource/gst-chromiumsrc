@@ -81,6 +81,7 @@ public:
         command_line->AppendSwitch("disable-gpu-sandbox");
         command_line->AppendSwitch("disable-seccomp-filter-sandbox");
         command_line->AppendSwitch("no-sandbox");
+        command_line->AppendSwitch("disable-field-trial-config");
 
         const gchar* display = g_getenv("DISPLAY");
         gboolean has_display = display != NULL && 
