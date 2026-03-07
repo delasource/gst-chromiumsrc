@@ -23,3 +23,5 @@ Thumbs.db
 
 # GStreamer cache
 cef_cache/
+
+gst-plugins-rs/
