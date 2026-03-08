@@ -51,7 +51,7 @@ SUBPROCESS_LDFLAGS = $(CEF_WRAPPER) -L$(CEF_LIB_DIR) -lcef \
 
 
 # Build Targets
-SOURCES = gstchromiumsrc.cpp cef_render_handler.cpp gpu_utils.cpp
+SOURCES = gstchromiumsrc.cpp cef_render_handler.cpp
 SUBPROCESS = chromiumsrc-subprocess
 
 .PHONY: all clean install
@@ -63,7 +63,7 @@ all: $(PLUGIN) $(SUBPROCESS)
 #
 # Builds the shared library that GStreamer loads as a source element.
 # This plugin initializes CEF and manages the browser lifecycle.
-$(PLUGIN): $(SOURCES) gstchromiumsrc.h cef_render_handler.h gpu_utils.h
+$(PLUGIN): $(SOURCES) gstchromiumsrc.h cef_render_handler.h
 	g++ $(CXXFLAGS) -o $@ $(SOURCES) $(LDFLAGS)
 
 # CEF Subprocess Binary Build Rule
@@ -75,11 +75,11 @@ $(PLUGIN): $(SOURCES) gstchromiumsrc.h cef_render_handler.h gpu_utils.h
 #
 # See subprocess_main.cpp for detailed documentation of the subprocess architecture.
 
-$(SUBPROCESS): subprocess_main.cpp gpu_utils.cpp gpu_utils.h
+$(SUBPROCESS): subprocess_main.cpp
 	g++ -std=c++20 -O2 \
 		-I$(CEF_DIR) \
 		$(GLIB_CFLAGS) \
-		-o $@ subprocess_main.cpp gpu_utils.cpp \
+		-o $@ subprocess_main.cpp \
 		$(SUBPROCESS_LDFLAGS)
 
 install: $(PLUGIN) $(SUBPROCESS)

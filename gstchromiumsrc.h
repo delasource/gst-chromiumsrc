@@ -28,7 +28,6 @@ struct _GstChromiumSrc {
     gint  width;
     gint  height;
     gint  fps_num;
-    gint  gpu_device;
 
     gpointer cef_browser;
     gpointer cef_client;
@@ -41,8 +40,6 @@ struct _GstChromiumSrc {
     gboolean frame_ready;
     gboolean running;
     gboolean page_loaded;
-    gboolean gpu_enabled;
-    gboolean gpu_user_specified;
 
     guint64 frame_count;
 };

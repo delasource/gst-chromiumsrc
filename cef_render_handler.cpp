@@ -1,6 +1,5 @@
 #include "cef_render_handler.h"
 #include "debug_utils.h"
-#include "gpu_utils.h"
 #include "gstchromiumsrc.h"
 
 #include <include/cef_app.h>
@@ -15,62 +14,10 @@
 
 static GMutex cef_init_mutex;
 static gboolean cef_initialized = FALSE;
-static GpuConfig* gpu_config = NULL;
 static guint cef_idle_id = 0;
 static int cef_message_count = 0;
 
 static gboolean cef_message_loop_idle(gpointer data);
-
-/**
- * gpu_ensure_config:
- * @src: The GstChromiumSrc instance
- *
- * Ensures GPU configuration is initialized exactly once. Determines whether
- * to enable GPU acceleration based on user specification and system availability.
- *
- * Decision logic:
- * - If user explicitly enabled GPU and GPU is available: enable GPU
- * - If user explicitly disabled GPU: disable GPU
- * - If user didn't specify (auto): enable GPU if available
- */
-static void gpu_ensure_config(GstChromiumSrc* src)
-{
-    if (gpu_config)
-    {
-        DEBUG_LOG_GL("ensure_config - Config already exists, skipping");
-        return;
-    }
-
-    gpu_config = gpu_config_new();
-
-    if (src->gpu_user_specified)
-    {
-        if (src->gpu_enabled && gpu_is_available())
-        {
-            gpu_config_detect(gpu_config);
-            src->gpu_device = gpu_config->device_index;
-        }
-        else
-        {
-            gpu_config->enabled = FALSE;
-            src->gpu_enabled = FALSE;
-        }
-    }
-    else
-    {
-        if (gpu_is_available())
-        {
-            gpu_config_detect(gpu_config);
-            src->gpu_enabled = gpu_config->enabled;
-            src->gpu_device = gpu_config->device_index;
-        }
-    }
-    DEBUG_LOG_GL("ensure_config - Final config: enabled=%d, device=%s",
-                 src->gpu_enabled, gpu_config->device_path ? gpu_config->device_path : "none");
-
-    // Log GL environment details
-    //debug_log_gl_info();
-}
 
 /**
  * CefRenderHandlerImpl - Handles offscreen rendering for CEF browser
@@ -419,7 +366,7 @@ static gboolean initialize_cef()
      * CefAppImpl - CEF application handler for command line processing
      *
      * Configures Chromium command line switches before browser creation.
-     * Handles GPU mode selection and headless rendering configuration.
+     * Handles headless rendering configuration.
      */
     class CefAppImpl : public CefApp, public CefBrowserProcessHandler
     {
@@ -428,14 +375,6 @@ static gboolean initialize_cef()
         {
         }
 
-        /**
-         * OnBeforeCommandLineProcessing:
-         * @process_type: Empty for browser process, type for subprocess
-         * @command_line: The command line to modify
-         *
-         * Called before CEF processes command line arguments.
-         * This is where we inject Chromium flags for GPU/headless modes.
-         */
         void OnBeforeCommandLineProcessing(const CefString& process_type,
                                            const CefRefPtr<CefCommandLine> command_line) override
         {
@@ -443,7 +382,6 @@ static gboolean initialize_cef()
             command_line->AppendSwitch("disable-sync");
             command_line->AppendSwitch("disable-background-networking");
             command_line->AppendSwitch("no-first-run");
-
             command_line->AppendSwitch("disable-gpu-sandbox");
             command_line->AppendSwitch("disable-seccomp-filter-sandbox");
             command_line->AppendSwitch("no-sandbox");
@@ -453,42 +391,12 @@ static gboolean initialize_cef()
             gboolean has_display = display != nullptr && 
                                    g_strcmp0(display, "NULL") != 0 &&
                                    strlen(display) > 0;
-            gboolean should_enable_gpu = (gpu_config && gpu_config->enabled) ||
-                (!gpu_config && gpu_is_available());
 
-            if (should_enable_gpu)
+            if (!has_display)
             {
-                //DEBUG_LOG_GL("OnBeforeChildProcessLaunch - Disabling GPU, using software compositing");
-                //command_line->AppendSwitch("disable-gpu");
-                //command_line->AppendSwitch("disable-software-rasterizer");
-                //command_line->AppendSwitchWithValue("num-raster-threads", "4");
-                command_line->AppendSwitchWithValue("use-gl", "egl-angle");
-                command_line->AppendSwitchWithValue("use-angle", "egl");
-                command_line->AppendSwitch("enable-gpu-rasterization");
-                command_line->AppendSwitch("enable-zero-copy");
-                command_line->AppendSwitch("ignore-gpu-blocklist");
-
-                if (!has_display)
-                {
-                    DEBUG_LOG_GL("OnBeforeCommandLineProcessing - NO DISPLAY");
-                    command_line->AppendSwitchWithValue("ozone-platform", "headless");
-                    command_line->AppendSwitchWithValue("headless", "new");
-                }
-                DEBUG_LOG_GL("OnBeforeCommandLineProcessing - GPU mode enabled");
-            }
-            else
-            {
-                // Use SwiftShader for software rendering instead of disabling GPU entirely
-                command_line->AppendSwitchWithValue("use-gl", "swiftshader");
-                command_line->AppendSwitch("disable-gpu");
-                command_line->AppendSwitch("in-process-gpu");
-
-                if (!has_display)
-                {
-                    command_line->AppendSwitchWithValue("ozone-platform", "headless");
-                    command_line->AppendSwitchWithValue("headless", "new");
-                }
-                DEBUG_LOG_GL("OnBeforeCommandLineProcessing - SwiftShader software rendering");
+                DEBUG_LOG_GL("OnBeforeCommandLineProcessing - No DISPLAY, using headless mode");
+                command_line->AppendSwitchWithValue("ozone-platform", "headless");
+                command_line->AppendSwitchWithValue("headless", "new");
             }
         }
 
@@ -497,55 +405,17 @@ static gboolean initialize_cef()
             return this;
         }
 
-        /**
-         * OnBeforeChildProcessLaunch:
-         * @command_line: The command line that will be passed to the child process
-         *
-         * Called before spawning a child process. This is where we pass GL-related
-         * switches to subprocesses (renderer, GPU, utility) so they use the same
-         * GL implementation as the browser process.
-         *
-         * Without this, subprocesses get gl=none,angle=none and fail to initialize.
-         */
         void OnBeforeChildProcessLaunch(CefRefPtr<CefCommandLine> command_line) override
         {
-            //DEBUG_LOG_GL("OnBeforeChildProcessLaunch - Initial: %s", command_line->GetCommandLineString().ToString().c_str());
-
             const gchar* display = g_getenv("DISPLAY");
             gboolean has_display = display != NULL &&
                                    g_strcmp0(display, "NULL") != 0 &&
                                    strlen(display) > 0;
-            gboolean should_enable_gpu = (gpu_config && gpu_config->enabled) ||
-                (!gpu_config && gpu_is_available());
 
-
-            if (should_enable_gpu)
+            if (!has_display)
             {
-                command_line->AppendSwitchWithValue("use-gl", "egl-angle");
-                command_line->AppendSwitchWithValue("use-angle", "egl");
-                command_line->AppendSwitch("enable-gpu-rasterization");
-                command_line->AppendSwitch("ignore-gpu-blocklist");
-                //DEBUG_LOG_GL("OnBeforeCommandLineProcessing - Disabling GPU, using software compositing");
-                //command_line->AppendSwitch("disable-gpu");
-                //command_line->AppendSwitch("disable-software-rasterizer");
-                //command_line->AppendSwitchWithValue("num-raster-threads", "4");
-
-                if (!has_display)
-                {
-                    command_line->AppendSwitchWithValue("ozone-platform", "headless");
-                    command_line->AppendSwitchWithValue("headless", "new");
-                }
-            }
-            else
-            {
-                command_line->AppendSwitchWithValue("use-gl", "swiftshader");
-                command_line->AppendSwitchWithValue("use-angle", "swiftshader");
-
-                if (!has_display)
-                {
-                    command_line->AppendSwitchWithValue("ozone-platform", "headless");
-                    command_line->AppendSwitchWithValue("headless", "new");
-                }
+                command_line->AppendSwitchWithValue("ozone-platform", "headless");
+                command_line->AppendSwitchWithValue("headless", "new");
             }
 
             command_line->AppendSwitch("disable-gpu-sandbox");
@@ -576,12 +446,6 @@ static gboolean initialize_cef()
     settings.windowless_rendering_enabled = TRUE;
     settings.log_severity = LOGSEVERITY_INFO;
     settings.multi_threaded_message_loop = FALSE;
-
-    // Disable GPU if configured
-    if (gpu_config && !gpu_config->enabled)
-    {
-        settings.chrome_runtime = FALSE;
-    }
 
     const gchar* env_subprocess = g_getenv("CHROMIUMSRC_SUBPROCESS_PATH");
     const gchar* home_dir = g_getenv("HOME");
@@ -700,8 +564,6 @@ extern "C" {
  */
 gboolean cef_browser_start(GstChromiumSrc* src, const gchar* url, gint width, gint height)
 {
-    gpu_ensure_config(src);
-
     if (!initialize_cef())
     {
         DEBUG_LOG("cef_browser_start - CEF initialization FAILED");
