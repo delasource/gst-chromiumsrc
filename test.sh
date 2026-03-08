@@ -1,6 +1,6 @@
 #!/bin/bash
 make clean
-make
+make || exit
 make install
 
 #timeout 5 \
@@ -10,5 +10,5 @@ make install
 
 timeout 5 \
 gst-launch-1.0 chromiumsrc url="http://localhost:5173/png-test.html" \
-  ! videoconvert ! autovideosink
+  ! videoconvert ! queue ! autovideosink
 

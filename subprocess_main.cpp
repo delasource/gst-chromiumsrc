@@ -30,7 +30,6 @@
 #include <glib.h>
 #include <string>
 #include <cstring>
-#include "gpu_utils.h"
 
 /**
  * CefSubprocessApp - CEF application handler for subprocess execution
@@ -71,52 +70,40 @@ public:
         CefRefPtr<CefCommandLine> command_line) override
     {
         process_type_ = process_type.ToString();
-        g_print("[%s] Subprocess starting\n", process_type_.c_str());
-        //g_print("[%s] Initial command line: %s\n", process_type_.c_str(), command_line->GetCommandLineString().ToString().c_str());
-
-        command_line->AppendSwitch("disable-extensions");
-        command_line->AppendSwitch("disable-sync");
-        command_line->AppendSwitch("disable-background-networking");
-        command_line->AppendSwitch("no-first-run");
-        command_line->AppendSwitch("disable-gpu-sandbox");
-        command_line->AppendSwitch("disable-seccomp-filter-sandbox");
-        command_line->AppendSwitch("no-sandbox");
-        command_line->AppendSwitch("disable-field-trial-config");
+        g_print("[%s] =====================\n", process_type_.c_str());
+        g_print("[%s] CEF Subprocess Binary - Build Time: %s %s\n", process_type_.c_str(), __DATE__, __TIME__);
+        g_print("[%s] =====================\n", process_type_.c_str());
 
         const gchar* display = g_getenv("DISPLAY");
-        gboolean has_display = display != NULL && 
-                               g_strcmp0(display, "NULL") != 0 &&
-                               strlen(display) > 0;
+        gboolean has_display = display != nullptr && g_strcmp0(display, "NULL") != 0 && strlen(display) > 0;
 
-        /*
-        gboolean should_enable_gpu = gpu_is_available();
-        g_print("[%s] GPU available check: %d\n", process_type_.c_str(), should_enable_gpu);
-
-        if (should_enable_gpu)
-        {
-            g_print("[%s] Disabling GPU, using software compositing\n", process_type_.c_str());
-            command_line->AppendSwitch("disable-gpu");
-            command_line->AppendSwitch("disable-software-rasterizer");
-            command_line->AppendSwitchWithValue("num-raster-threads", "4");
-        }
-        else
-        {
-            g_print("[%s] Setting use-gl=swiftshader\n", process_type_.c_str());
-            command_line->AppendSwitchWithValue("use-gl", "swiftshader");
-            command_line->AppendSwitch("disable-gpu");
-            command_line->AppendSwitch("in-process-gpu");
-        }
-        */
+        // Disable browser extensions - not needed for headless rendering
+        command_line->AppendSwitch("disable-extensions");
+        // Disable Chrome sync services - not needed for this use case
+        command_line->AppendSwitch("disable-sync");
+        // Disable background network activity to reduce resource usage
+        command_line->AppendSwitch("disable-background-networking");
+        // Skip first-run wizard and welcome pages
+        command_line->AppendSwitch("no-first-run");
+        // Disable GPU sandbox - needed for containerized/privileged environments
+        command_line->AppendSwitch("disable-gpu-sandbox");
+        // Disable seccomp-bpf filter sandbox - needed for container compatibility
+        command_line->AppendSwitch("disable-seccomp-filter-sandbox");
+        // Disable all sandboxing - required for running in Docker/containers
+        command_line->AppendSwitch("no-sandbox");
+        // Disable field trial experiments for deterministic behavior
+        command_line->AppendSwitch("disable-field-trial-config");
 
         if (!has_display)
         {
             g_print("[%s] No valid DISPLAY, using headless mode\n", process_type_.c_str());
+            // Use Ozone headless platform for rendering without a display server
             command_line->AppendSwitchWithValue("ozone-platform", "headless");
+            // Enable new headless mode (Chrome's modern headless implementation)
             command_line->AppendSwitchWithValue("headless", "new");
         }
-        
-        g_print("[%s] Final command line: %s\n", process_type_.c_str(),
-                command_line->GetCommandLineString().ToString().c_str());
+
+        // g_print("[%s] Final command line: %s\n", process_type_.c_str(), command_line->GetCommandLineString().ToString().c_str());
     }
 
     IMPLEMENT_REFCOUNTING(CefSubprocessApp);
@@ -143,14 +130,9 @@ private:
 int main(int argc, char* argv[])
 {
     CefMainArgs main_args(argc, argv);
-    CefRefPtr<CefSubprocessApp> app = new CefSubprocessApp();
-
-    g_print("=====================\n");
-    g_print("CEF Subprocess Binary - Build Time: %s %s\n", __DATE__, __TIME__);
-    g_print("=====================\n");
+    const CefRefPtr<CefSubprocessApp> app = new CefSubprocessApp();
 
     int exit_code = CefExecuteProcess(main_args, app, nullptr);
-
     if (exit_code >= 0)
     {
         g_print("[%s] CefExecuteProcess returned: %d\n",

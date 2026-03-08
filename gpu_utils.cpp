@@ -25,7 +25,7 @@ gint gpu_detect_best_device(void) {
         if (g_str_has_prefix(name, "renderD")) {
             gint num = atoi(name + 7);
             device_count++;
-            DEBUG_LOG_GL("detect_best_device - Found device: %s (number: %d)", name, num);
+            //DEBUG_LOG_GL("detect_best_device - Found device: %s (number: %d)", name, num);
             if (num > highest_render) {
                 highest_render = num;
             }
@@ -33,8 +33,7 @@ gint gpu_detect_best_device(void) {
     }
     g_dir_close(dir);
     
-    DEBUG_LOG_GL("detect_best_device - Total devices found: %d, best device: %d", 
-            device_count, highest_render);
+    // DEBUG_LOG_GL("detect_best_device - Total devices found: %d, best device: %d", device_count, highest_render);
     return highest_render;
 }
 

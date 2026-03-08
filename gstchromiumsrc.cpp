@@ -168,8 +168,6 @@ static void gst_chromium_src_init(GstChromiumSrc *src) {
     g_cond_init(&src->frame_cond);
 
     src->cef_browser = NULL;
-    src->cef_client = NULL;
-    src->cef_thread = NULL;
 }
 
 /**
@@ -568,11 +566,9 @@ static GstStateChangeReturn gst_chromium_src_change_state(
 static gboolean plugin_init(GstPlugin *plugin) {
     // Initialize debug system with unique instance ID
     debug_init();
-    DEBUG_LOG("=== Chromium Source Plugin Initialized ===");
-    DEBUG_LOG("Plugin loaded - Instance ID: %s", debug_get_id());
-    
-    return gst_element_register(plugin, "chromiumsrc", GST_RANK_NONE,
-        GST_TYPE_CHROMIUM_SRC);
+    DEBUG_LOG("===== Plugin starting =====");
+
+    return gst_element_register(plugin, "chromiumsrc", GST_RANK_NONE, GST_TYPE_CHROMIUM_SRC);
 }
 
 GST_PLUGIN_DEFINE(
