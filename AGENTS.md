@@ -1,3 +1,8 @@
+# Code guidelines
+
+- Include comments (or leave untouched) to increase code blocks readability.
+
+
 # Build Commands
 
 run:
