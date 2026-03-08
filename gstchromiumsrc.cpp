@@ -108,7 +108,7 @@ static void gst_chromium_src_class_init(GstChromiumSrcClass *klass) {
         "Chromium Source",
         "Source/Video",
         "Offscreen CEF/Chromium browser as video source",
-        "opencode");
+        "delasource");
 
     gst_element_class_add_static_pad_template(gstelement_class, &src_template);
 
