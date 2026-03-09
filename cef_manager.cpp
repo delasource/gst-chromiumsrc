@@ -134,7 +134,7 @@ public:
         /*
         if (gpu_enabled_)
         {
-            DEBUG_LOG_GL("BeforeChildProcessLaunch - GPU enabled, using egl-angle");
+            // DEBUG_LOG_GL("BeforeChildProcessLaunch - GPU enabled, using egl-angle");
             command_line->AppendSwitchWithValue("use-gl", "egl-angle");
             command_line->AppendSwitchWithValue("use-angle", "egl");
             command_line->AppendSwitch("enable-gpu-rasterization");
@@ -148,7 +148,7 @@ public:
         }
         else
         {
-            DEBUG_LOG_GL("BeforeChildProcessLaunch - GPU disabled, using SwiftShader");
+            //DEBUG_LOG_GL("BeforeChildProcessLaunch - GPU disabled, using SwiftShader");
             command_line->AppendSwitchWithValue("use-gl", "swiftshader");
             command_line->AppendSwitchWithValue("use-angle", "swiftshader");
 
@@ -347,7 +347,6 @@ CefManager* CefManager::get()
 
 CefManager::CefManager()
     : initialized_(FALSE),
-      message_loop_id_(0),
       running_(FALSE),
       gpu_enabled_(FALSE),
       gpu_user_specified_(FALSE),
@@ -362,14 +361,10 @@ CefManager::CefManager()
     }
 
     initialized_ = TRUE;
-    start_message_loop();
 }
 
 CefManager::~CefManager()
 {
-    // Stop message loop
-    stop_message_loop();
-
     // Close all browsers
     g_mutex_lock(&browsers_mutex_);
     for (auto& pair : browser_clients_)
@@ -429,7 +424,7 @@ gboolean CefManager::initialize_cef()
     settings.no_sandbox = TRUE;
     settings.windowless_rendering_enabled = TRUE;
     settings.log_severity = LOGSEVERITY_INFO;
-    settings.multi_threaded_message_loop = FALSE;
+    settings.multi_threaded_message_loop = TRUE;
 
     if (!gpu_enabled_)
     {
@@ -521,53 +516,6 @@ gboolean CefManager::initialize_cef()
     return TRUE;
 }
 
-void CefManager::start_message_loop()
-{
-    running_ = TRUE;
-    // Interval based on framerate: 1000ms / fps, with minimum of 8ms
-    guint interval_ms = MAX(8, 1000 / 60); // Default to 60 FPS
-    message_loop_id_ = g_timeout_add(interval_ms, message_loop_callback, this);
-    DEBUG_LOG_CEF("Message loop started (id=%u, interval=%ums)", message_loop_id_, interval_ms);
-}
-
-void CefManager::stop_message_loop()
-{
-    running_ = FALSE;
-    if (message_loop_id_)
-    {
-        g_source_remove(message_loop_id_);
-        message_loop_id_ = 0;
-        DEBUG_LOG_CEF("Message loop stopped");
-    }
-}
-
-gboolean CefManager::message_loop_callback(gpointer data)
-{
-    CefManager* self = static_cast<CefManager*>(data);
-
-    if (!self->running_)
-    {
-        return G_SOURCE_REMOVE;
-    }
-
-    // Pump CEF message loop
-    CefDoMessageLoopWork();
-
-    // Invalidate all browser views to trigger repaints
-    g_mutex_lock(&self->browsers_mutex_);
-    for (auto& pair : self->browser_clients_)
-    {
-        BrowserInstance* browser = pair.first;
-        if (browser && browser->running && browser->page_loaded && browser->cef_browser)
-        {
-            browser->cef_browser->GetHost()->Invalidate(PET_VIEW);
-        }
-    }
-    g_mutex_unlock(&self->browsers_mutex_);
-
-    return G_SOURCE_CONTINUE;
-}
-
 BrowserInstance* CefManager::create_browser(
     const gchar* url,
     gint width,
@@ -581,14 +529,6 @@ BrowserInstance* CefManager::create_browser(
         return nullptr;
     }
 
-    // Pump message loop a few times to ensure CEF is ready
-    // 1000*1000 = 1s
-    for (int i = 0; i < 1000; i++)
-    {
-        CefDoMessageLoopWork();
-        g_usleep(1000);
-    }
-
     // Create browser instance
     const auto browser = new BrowserInstance();
     browser->width = width;
@@ -599,16 +539,12 @@ BrowserInstance* CefManager::create_browser(
     browser->callbacks = *callbacks;
 
     // Create handlers
-    CefRefPtr<CefManagerRenderHandler> render_handler =
-        new CefManagerRenderHandler(this, browser, width, height);
-    CefRefPtr<CefManagerLoadHandler> load_handler =
-        new CefManagerLoadHandler(this, browser);
-    CefRefPtr<CefManagerLifeSpanHandler> lifespan_handler =
-        new CefManagerLifeSpanHandler(this, browser);
+    const auto render_handler = new CefManagerRenderHandler(this, browser, width, height);
+    const auto load_handler = new CefManagerLoadHandler(this, browser);
+    const auto lifespan_handler = new CefManagerLifeSpanHandler(this, browser);
 
     // Create client
-    CefRefPtr<CefManagerClient> client =
-        new CefManagerClient(render_handler, load_handler, lifespan_handler);
+    const auto client = new CefManagerClient(render_handler, load_handler, lifespan_handler);
 
     // Track browser
     g_mutex_lock(&browsers_mutex_);
@@ -625,8 +561,7 @@ BrowserInstance* CefManager::create_browser(
 
     CefString cef_url(url);
 
-    DEBUG_LOG_CEF("CreateBrowser - url=%s, width=%d, height=%d, fps=%d",
-                  url, width, height, fps);
+    DEBUG_LOG_CEF("CreateBrowser - url=%s, width=%d, height=%d, fps=%d", url, width, height, fps);
 
     // Create browser asynchronously
     if (!CefBrowserHost::CreateBrowser(

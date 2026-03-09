@@ -214,29 +214,6 @@ private:
     gboolean initialize_cef();
 
     /**
-     * start_message_loop:
-     *
-     * Starts the GLib-based message loop for CEF.
-     * Uses g_timeout_add to periodically call CefDoMessageLoopWork().
-     */
-    void start_message_loop();
-
-    /**
-     * stop_message_loop:
-     *
-     * Stops the GLib message loop.
-     */
-    void stop_message_loop();
-
-    /**
-     * message_loop_callback:
-     *
-     * Static callback for GLib timeout.
-     * Calls CefDoMessageLoopWork() and invalidates all browser views.
-     */
-    static gboolean message_loop_callback(gpointer data);
-
-    /**
      * on_browser_created:
      * @browser: The newly created browser instance
      * @cef_browser: The CEF browser handle
@@ -298,7 +275,6 @@ private:
     CefRefPtr<CefApp> cef_app_;
 
     // Message loop
-    guint message_loop_id_;
     gboolean running_;
 
     // GPU configuration
