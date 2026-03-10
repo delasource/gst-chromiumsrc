@@ -82,6 +82,9 @@ extern "C" {
 gboolean cef_browser_start(GstChromiumSrc* src, const gchar* url, gint width, gint height) {
     DEBUG_LOG_CEF("cef_browser_start - url=%s, width=%d, height=%d", url, width, height);
 
+    // Configure GPU settings before CEF initialization
+    cef_manager_configure(!src->gpu_enabled, src->gpu_user_specified);
+
     // Get the singleton manager
     CefManager* manager = static_cast<CefManager*>(cef_manager_get());
     if (!manager) {
@@ -114,7 +117,7 @@ gboolean cef_browser_start(GstChromiumSrc* src, const gchar* url, gint width, gi
     src->cef_browser = static_cast<gpointer>(browser);
 
     // Copy GPU settings from manager
-    src->gpu_enabled = manager->is_gpu_enabled();
+    src->gpu_enabled = !manager->is_gpu_disabled();
     src->gpu_device = manager->get_gpu_device();
 
     DEBUG_LOG_CEF("cef_browser_start - Browser created successfully");

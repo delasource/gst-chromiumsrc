@@ -32,6 +32,8 @@ struct _BrowserInstance
 
 CefManager* CefManager::instance_ = nullptr;
 GMutex CefManager::init_mutex_;
+gboolean CefManager::config_disable_gpu_ = FALSE;
+gboolean CefManager::config_gpu_user_specified_ = FALSE;
 
 // ============================================================================
 // CefApp implementation - Handles command line processing
@@ -46,8 +48,8 @@ GMutex CefManager::init_mutex_;
 class CefManagerApp : public CefApp, public CefBrowserProcessHandler
 {
 public:
-    CefManagerApp(gboolean gpu_enabled, gint gpu_device)
-        : gpu_enabled_(gpu_enabled), gpu_device_(gpu_device)
+    CefManagerApp(gboolean is_gpu_disabled, gint gpu_device)
+        : is_gpu_disabled_(is_gpu_disabled), gpu_device_(gpu_device)
     {
     }
 
@@ -68,23 +70,25 @@ public:
         command_line->AppendSwitch("disable-sync");
         command_line->AppendSwitch("disable-background-networking");
         command_line->AppendSwitch("no-first-run");
+        //command_line->AppendSwitchWithValue("log-severity", "verbose");
 
         // Sandbox settings
-        command_line->AppendSwitch("disable-gpu-sandbox");
-        command_line->AppendSwitch("disable-seccomp-filter-sandbox");
-        command_line->AppendSwitch("no-sandbox");
+        // These are already present because of CefSettings.no_sandbox
+        // command_line->AppendSwitch("disable-gpu-sandbox");
+        // command_line->AppendSwitch("disable-seccomp-filter-sandbox");
+        // command_line->AppendSwitch("no-sandbox");
         command_line->AppendSwitch("disable-field-trial-config");
 
         // Check for display
         const gchar* display = g_getenv("DISPLAY");
         gboolean has_display = display != nullptr && g_strcmp0(display, "NULL") != 0 && strlen(display) > 0;
 
-        if (gpu_enabled_)
+        if (!is_gpu_disabled_)
         {
             // GPU acceleration mode
             command_line->AppendSwitchWithValue("use-gl", "egl-angle");
             command_line->AppendSwitchWithValue("use-angle", "egl");
-            command_line->AppendSwitch("enable-gpu-rasterization");
+            // command_line->AppendSwitch("enable-gpu-rasterization");
             command_line->AppendSwitch("enable-zero-copy");
             command_line->AppendSwitch("ignore-gpu-blocklist");
 
@@ -100,7 +104,7 @@ public:
         {
             // SwiftShader software rendering
             command_line->AppendSwitchWithValue("use-gl", "swiftshader");
-            command_line->AppendSwitch("disable-gpu");
+            command_line->AppendSwitchWithValue("use-angle", "swiftshader");
             command_line->AppendSwitch("in-process-gpu");
 
             if (!has_display)
@@ -128,16 +132,21 @@ public:
      */
     void OnBeforeChildProcessLaunch(CefRefPtr<CefCommandLine> command_line) override
     {
+        // These are already present because of CefSettings.no_sandbox
+        // command_line->AppendSwitch("disable-gpu-sandbox");
+        // command_line->AppendSwitch("disable-seccomp-filter-sandbox");
+        // command_line->AppendSwitch("no-sandbox");
+        // command_line->AppendSwitchWithValue("log-severity", "verbose");
+
         const gchar* display = g_getenv("DISPLAY");
         gboolean has_display = display != NULL && g_strcmp0(display, "NULL") != 0 && strlen(display) > 0;
 
-        /*
-        if (gpu_enabled_)
+        if (!is_gpu_disabled_)
         {
             // DEBUG_LOG_GL("BeforeChildProcessLaunch - GPU enabled, using egl-angle");
             command_line->AppendSwitchWithValue("use-gl", "egl-angle");
             command_line->AppendSwitchWithValue("use-angle", "egl");
-            command_line->AppendSwitch("enable-gpu-rasterization");
+            // command_line->AppendSwitch("enable-gpu-rasterization");
             command_line->AppendSwitch("ignore-gpu-blocklist");
 
             if (!has_display)
@@ -158,17 +167,12 @@ public:
                 command_line->AppendSwitchWithValue("headless", "new");
             }
         }
-        */
-
-        command_line->AppendSwitch("disable-gpu-sandbox");
-        command_line->AppendSwitch("disable-seccomp-filter-sandbox");
-        command_line->AppendSwitch("no-sandbox");
 
         // DEBUG_LOG_GL("OnBeforeChildProcessLaunch - %s", command_line->GetCommandLineString().ToString().c_str());
     }
 
 private:
-    gboolean gpu_enabled_;
+    gboolean is_gpu_disabled_;
     gint gpu_device_;
     IMPLEMENT_REFCOUNTING(CefManagerApp);
 };
@@ -328,6 +332,12 @@ private:
 // CefManager Implementation
 // ============================================================================
 
+void CefManager::configure(gboolean disable_gpu, gboolean gpu_user_specified)
+{
+    config_disable_gpu_ = disable_gpu;
+    config_gpu_user_specified_ = gpu_user_specified;
+}
+
 CefManager* CefManager::get()
 {
     // Thread-safe static initialization (C++11 magic statics)
@@ -348,7 +358,7 @@ CefManager* CefManager::get()
 CefManager::CefManager()
     : initialized_(FALSE),
       running_(FALSE),
-      gpu_enabled_(FALSE),
+      is_gpu_disabled_(TRUE),
       gpu_user_specified_(FALSE),
       gpu_device_(-1)
 {
@@ -384,6 +394,10 @@ CefManager::~CefManager()
         CefShutdown();
         DEBUG_LOG_CEF("CEF shutdown complete");
     }
+    else
+    {
+        DEBUG_LOG_CEF("Deconstructed without CEF shutdown");
+    }
 
     g_mutex_clear(&browsers_mutex_);
 }
@@ -393,20 +407,31 @@ gboolean CefManager::initialize_cef()
     DEBUG_LOG_CEF("=== Initializing CEF ===");
 
     // Determine GPU configuration
-    GpuConfig* gpu_cfg = gpu_config_new();
-    if (gpu_is_available())
+    if (config_gpu_user_specified_)
     {
-        gpu_config_detect(gpu_cfg);
-        gpu_enabled_ = gpu_cfg->enabled;
-        gpu_device_ = gpu_cfg->device_index;
+        // User explicitly set GPU mode
+        is_gpu_disabled_ = config_disable_gpu_;
+        gpu_device_ = -1;
+        DEBUG_LOG_CEF("GPU user-specified: disabled=%d", is_gpu_disabled_);
     }
     else
     {
-        gpu_enabled_ = FALSE;
+        // Auto-detect GPU
+        GpuConfig* gpu_cfg = gpu_config_new();
+        if (gpu_is_available())
+        {
+            gpu_config_detect(gpu_cfg);
+            is_gpu_disabled_ = !gpu_cfg->enabled;
+            gpu_device_ = gpu_cfg->device_index;
+        }
+        else
+        {
+            is_gpu_disabled_ = TRUE;
+        }
+        gpu_config_free(gpu_cfg);
     }
-    gpu_config_free(gpu_cfg);
 
-    DEBUG_LOG_CEF("GPU config: enabled=%d, device=%d", gpu_enabled_, gpu_device_);
+    DEBUG_LOG_CEF("GPU config: disabled=%d, device=%d", is_gpu_disabled_, gpu_device_);
 
     // Log environment
     // DEBUG_LOG_CEF("=== Environment Variables ===");
@@ -417,7 +442,7 @@ gboolean CefManager::initialize_cef()
 
     // Create CEF app
     CefMainArgs main_args;
-    cef_app_ = new CefManagerApp(gpu_enabled_, gpu_device_);
+    cef_app_ = new CefManagerApp(is_gpu_disabled_, gpu_device_);
 
     // CEF settings
     CefSettings settings;
@@ -425,11 +450,7 @@ gboolean CefManager::initialize_cef()
     settings.windowless_rendering_enabled = TRUE;
     settings.log_severity = LOGSEVERITY_INFO;
     settings.multi_threaded_message_loop = TRUE;
-
-    if (!gpu_enabled_)
-    {
-        settings.chrome_runtime = FALSE;
-    }
+    CefString(&settings.log_file) = "/tmp/chromiumsrc_cef.log";
 
     // Find subprocess binary
     const gchar* env_subprocess = g_getenv("CHROMIUMSRC_SUBPROCESS_PATH");
@@ -657,6 +678,11 @@ void CefManager::on_browser_load_error(
 // ============================================================================
 
 extern "C" {
+void cef_manager_configure(gboolean disable_gpu, gboolean gpu_user_specified)
+{
+    CefManager::configure(disable_gpu, gpu_user_specified);
+}
+
 gpointer cef_manager_get(void)
 {
     return CefManager::get();
