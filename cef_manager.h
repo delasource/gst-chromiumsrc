@@ -32,6 +32,18 @@ typedef struct {
 } BrowserCallbacks;
 
 /**
+ * cef_manager_configure:
+ * @disable_gpu: TRUE to force disable GPU, FALSE to use auto-detection
+ * @gpu_user_specified: TRUE if user explicitly set GPU mode
+ *
+ * Configures GPU settings before CEF initialization.
+ * Must be called before cef_manager_get().
+ * If @gpu_user_specified is TRUE, the @disable_gpu value is used.
+ * If @gpu_user_specified is FALSE, GPU is auto-detected.
+ */
+void cef_manager_configure(gboolean disable_gpu, gboolean gpu_user_specified);
+
+/**
  * cef_manager_get:
  *
  * Returns the singleton CefManager instance. Initializes CEF on first call.
@@ -118,6 +130,16 @@ G_END_DECLS
 class CefManager {
 public:
     /**
+     * configure:
+     * @disable_gpu: TRUE to force disable GPU, FALSE to use auto-detection
+     * @gpu_user_specified: TRUE if user explicitly set GPU mode
+     *
+     * Configures GPU settings before CEF initialization.
+     * Must be called before get().
+     */
+    static void configure(gboolean disable_gpu, gboolean gpu_user_specified);
+
+    /**
      * get:
      *
      * Returns the singleton CefManager instance.
@@ -175,11 +197,11 @@ public:
     gboolean is_page_loaded(BrowserInstance* browser);
 
     /**
-     * is_gpu_enabled:
+     * is_gpu_disabled:
      *
-     * Returns whether GPU acceleration is enabled.
+     * Returns whether GPU acceleration is disabled.
      */
-    gboolean is_gpu_enabled() const { return gpu_enabled_; }
+    gboolean is_gpu_disabled() const { return is_gpu_disabled_; }
 
     /**
      * get_gpu_device:
@@ -270,6 +292,10 @@ private:
     static CefManager* instance_;
     static GMutex init_mutex_;
 
+    // Pre-initialization configuration
+    static gboolean config_disable_gpu_;
+    static gboolean config_gpu_user_specified_;
+
     // CEF state
     gboolean initialized_;
     CefRefPtr<CefApp> cef_app_;
@@ -278,7 +304,7 @@ private:
     gboolean running_;
 
     // GPU configuration
-    gboolean gpu_enabled_;
+    gboolean is_gpu_disabled_;
     gboolean gpu_user_specified_;
     gint gpu_device_;
 

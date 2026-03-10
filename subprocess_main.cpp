@@ -78,21 +78,23 @@ public:
         gboolean has_display = display != nullptr && g_strcmp0(display, "NULL") != 0 && strlen(display) > 0;
 
         // Disable browser extensions - not needed for headless rendering
-        command_line->AppendSwitch("disable-extensions");
+        // command_line->AppendSwitch("disable-extensions");
         // Disable Chrome sync services - not needed for this use case
-        command_line->AppendSwitch("disable-sync");
+        // command_line->AppendSwitch("disable-sync");
         // Disable background network activity to reduce resource usage
-        command_line->AppendSwitch("disable-background-networking");
+        // command_line->AppendSwitch("disable-background-networking");
         // Skip first-run wizard and welcome pages
-        command_line->AppendSwitch("no-first-run");
+        // command_line->AppendSwitch("no-first-run");
         // Disable GPU sandbox - needed for containerized/privileged environments
-        command_line->AppendSwitch("disable-gpu-sandbox");
+        // command_line->AppendSwitch("disable-gpu-sandbox");
         // Disable seccomp-bpf filter sandbox - needed for container compatibility
-        command_line->AppendSwitch("disable-seccomp-filter-sandbox");
+        // command_line->AppendSwitch("disable-seccomp-filter-sandbox");
         // Disable all sandboxing - required for running in Docker/containers
-        command_line->AppendSwitch("no-sandbox");
+        // command_line->AppendSwitch("no-sandbox");
         // Disable field trial experiments for deterministic behavior
-        command_line->AppendSwitch("disable-field-trial-config");
+        // command_line->AppendSwitch("disable-field-trial-config");
+        // Enable verbose logging for debugging
+        command_line->AppendSwitchWithValue("log-severity", "verbose");
 
         if (!has_display)
         {
@@ -129,8 +131,17 @@ private:
  */
 int main(int argc, char* argv[])
 {
+    // Sleep for 1ms, so CEF main process can think a moment
+    g_usleep(1000);
+
+    g_print("[main] subprocess_main invoked with %d args:\n", argc);
+    for (int i = 0; i < argc; i++)
+    {
+        g_print("     %s\n", argv[i]);
+    }
+
     CefMainArgs main_args(argc, argv);
-    const CefRefPtr<CefSubprocessApp> app = new CefSubprocessApp();
+    const CefRefPtr app = new CefSubprocessApp();
 
     int exit_code = CefExecuteProcess(main_args, app, nullptr);
     if (exit_code >= 0)
@@ -138,6 +149,8 @@ int main(int argc, char* argv[])
         g_print("[%s] CefExecuteProcess returned: %d\n",
                 app->GetProcessType().c_str(), exit_code);
     }
+
+    g_print("[%s] EOF", app->GetProcessType().c_str());
 
     return exit_code;
 }
