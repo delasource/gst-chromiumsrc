@@ -1,5 +1,5 @@
-#ifndef __CEF_RENDER_HANDLER_H__
-#define __CEF_RENDER_HANDLER_H__
+#ifndef __CEF_GST_BRIDGE_H__
+#define __CEF_GST_BRIDGE_H__
 
 #include "gstchromiumsrc.h"
 

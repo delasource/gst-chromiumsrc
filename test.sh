@@ -1,7 +1,8 @@
 #!/bin/bash
-make clean
-make || exit
-make install
+rm -rf build
+cmake -B build -DCMAKE_BUILD_TYPE=Release || exit
+cmake --build build || exit
+cmake --install build
 
 #timeout 5 \
 #gst-launch-1.0 chromiumsrc url="http://localhost:5173/png-test.html" \

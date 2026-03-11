@@ -5,16 +5,29 @@
 
 # Build Commands
 
-run:
+Configure and build:
 
 ```
-make clean && make
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 ```
 
-test it:
+Install:
 
 ```
-make install
+cmake --install build
+```
+
+Clean:
+
+```
+rm -rf build
+```
+
+Test it:
+
+```
+cmake --install build
 
 # If a display is available:
 timeout 5 gst-launch-1.0 chromiumsrc url="http://localhost:5173/png-test.html" ! videoconvert ! autovideosink

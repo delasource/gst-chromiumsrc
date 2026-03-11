@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This script installs additional gstreamer plugins from the gst-plugins-rs Repository.
+# These are not needed for the Chromium-Plugin, but i did need them for my application
+
 # Install Rust and Cargo-C if needed:
 #   curl https://sh.rustup.rs -sSf | sh
 #   cargo install cargo-c

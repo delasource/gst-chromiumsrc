@@ -8,7 +8,7 @@ set -e
 #CEF_VERSION="121.3.15%2Bg4d3b0b4%2Bchromium-121.0.6167.184"
 CEF_VERSION="145.0.28%2Bg51162e8%2Bchromium-145.0.7632.160"
 CEF_DIR="third_party/cef"
-BUILD_DIR="build_cef_wrapper"
+BUILD_DIR="third_party/build_cef_wrapper"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 cd "$SCRIPT_DIR"
@@ -200,12 +200,7 @@ download_cef() {
 
 build_wrapper() {
     if [ -f "$BUILD_DIR/libcef_dll_wrapper/libcef_dll_wrapper.a" ]; then
-        echo "CEF wrapper already built at $BUILD_DIR/libcef_dll_wrapper/libcef_dll_wrapper.a"
-        read -p "Rebuild? [y/N] " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            return 0
-        fi
+        rm -f "$BUILD_DIR/libcef_dll_wrapper/libcef_dll_wrapper.a"
     fi
     
     echo "Building CEF wrapper..."
@@ -213,8 +208,9 @@ build_wrapper() {
     rm -rf "$BUILD_DIR"
     mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
-    
-    cmake ../third_party/cef -DCMAKE_BUILD_TYPE=Release
+
+    # Build wrapper into this directory
+    cmake ../cef -DCMAKE_BUILD_TYPE=Release
     
     if [ "$(uname -s)" = "Darwin" ]; then
         NPROC=$(sysctl -n hw.ncpu)
@@ -225,9 +221,9 @@ build_wrapper() {
     make libcef_dll_wrapper -j"$NPROC"
 
     # Move file to cef/Release dir
-    mkdir -p ../third_party/cef/Release
-    rm -f ../third_party/cef/Release/libcef_dll_wrapper.a
-    cp libcef_dll_wrapper/libcef_dll_wrapper.a ../third_party/cef/Release/
+    mkdir -p ../cef/Release
+    rm -f ../cef/Release/libcef_dll_wrapper.a
+    cp libcef_dll_wrapper/libcef_dll_wrapper.a ../cef/Release/
 
     cd "$SCRIPT_DIR"
     
@@ -262,7 +258,10 @@ main() {
     
     echo
     echo "=== Setup Complete ==="
-    echo "You can now run 'make' to build the plugin."
+    echo "You can now run:"
+    echo "  cmake -B build -DCMAKE_BUILD_TYPE=Release"
+    echo "  cmake --build build"
+    echo "  cmake --install build"
 }
 
 main "$@"

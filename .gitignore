@@ -5,9 +5,15 @@
 *.dylib
 chromiumsrc-subprocess
 
+# CMake build
+build/
+compile_commands.json
+.cmake/
+.cache/
+
 
 # CEF wrapper build
-build_cef_wrapper/
+third_party/build_cef_wrapper/
 third_party/cef/
 
 # IDE/Editor

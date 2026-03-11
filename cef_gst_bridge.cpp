@@ -1,4 +1,5 @@
-#include "cef_render_handler.h"
+#include "cef_gst_bridge.h"
+#include "cef_browser_client.h"
 #include "cef_manager.h"
 #include "debug_utils.h"
 
@@ -61,7 +62,7 @@ static void on_load_end_callback(void* user_data, int http_status_code) {
 }
 
 // ============================================================================
-// Public API - Wraps CefManager for backward compatibility
+// Public API - Wraps CefManager and CefBrowserClient for GStreamer
 // ============================================================================
 
 extern "C" {
@@ -85,7 +86,7 @@ gboolean cef_browser_start(GstChromiumSrc* src, const gchar* url, gint width, gi
     // Configure GPU settings before CEF initialization
     cef_manager_configure(!src->gpu_enabled, src->gpu_user_specified);
 
-    // Get the singleton manager
+    // Get the singleton manager (initializes CEF if needed)
     CefManager* manager = static_cast<CefManager*>(cef_manager_get());
     if (!manager) {
         DEBUG_LOG_CEF("cef_browser_start - Failed to get CefManager");
@@ -98,9 +99,8 @@ gboolean cef_browser_start(GstChromiumSrc* src, const gchar* url, gint width, gi
     callbacks.on_load_end = on_load_end_callback;
     callbacks.user_data = src;
 
-    // Create browser through manager
-    BrowserInstance* browser = cef_manager_create_browser(
-        manager,
+    // Create browser through browser client
+    BrowserInstance* browser = cef_browser_create(
         url,
         width,
         height,
@@ -138,14 +138,9 @@ void cef_browser_stop(GstChromiumSrc* src) {
         return;
     }
 
-    CefManager* manager = static_cast<CefManager*>(cef_manager_get());
-    if (!manager) {
-        return;
-    }
-
-    // Destroy browser through manager
+    // Destroy browser through browser client
     if (src->cef_browser) {
-        cef_manager_destroy_browser(manager, static_cast<BrowserInstance*>(src->cef_browser));
+        cef_browser_destroy(static_cast<BrowserInstance*>(src->cef_browser));
         src->cef_browser = NULL;
     }
 

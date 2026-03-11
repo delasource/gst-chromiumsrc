@@ -1,5 +1,5 @@
 #include "gstchromiumsrc.h"
-#include "cef_render_handler.h"
+#include "cef_gst_bridge.h"
 #include "debug_utils.h"
 
 #include <gst/app/gstappsrc.h>

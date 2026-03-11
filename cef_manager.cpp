@@ -12,21 +12,6 @@
 #include <vector>
 
 // ============================================================================
-// BrowserInstance - Internal browser tracking structure
-// ============================================================================
-
-struct _BrowserInstance
-{
-    CefRefPtr<CefBrowser> cef_browser;
-    BrowserCallbacks callbacks;
-    gint width;
-    gint height;
-    gint fps;
-    gboolean page_loaded;
-    gboolean running;
-};
-
-// ============================================================================
 // Static initialization (thread-safe in C++11)
 // ============================================================================
 
@@ -178,157 +163,6 @@ private:
 };
 
 // ============================================================================
-// CEF Handler implementations
-// ============================================================================
-
-/**
- * CefManagerRenderHandler - Handles offscreen rendering for a browser
- */
-class CefManagerRenderHandler : public CefRenderHandler
-{
-public:
-    CefManagerRenderHandler(CefManager* manager, BrowserInstance* browser, int width, int height)
-        : manager_(manager), browser_(browser), width_(width), height_(height)
-    {
-    }
-
-    void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override
-    {
-        rect.Set(0, 0, width_, height_);
-    }
-
-    void OnPaint(
-        CefRefPtr<CefBrowser> browser,
-        PaintElementType type,
-        const RectList& dirtyRects,
-        const void* buffer,
-        int width,
-        int height) override
-    {
-        if (!browser_ || !browser_->running)
-        {
-            return;
-        }
-
-        if (width != width_ || height != height_)
-        {
-            DEBUG_LOG("OnPaint - Size mismatch: got %dx%d, expected %dx%d",
-                      width, height, width_, height_);
-            return;
-        }
-
-        // Forward to manager
-        manager_->on_browser_paint(browser_, buffer, width, height);
-    }
-
-private:
-    CefManager* manager_;
-    BrowserInstance* browser_;
-    int width_;
-    int height_;
-    IMPLEMENT_REFCOUNTING(CefManagerRenderHandler);
-};
-
-/**
- * CefManagerLoadHandler - Handles page load events
- */
-class CefManagerLoadHandler : public CefLoadHandler
-{
-public:
-    CefManagerLoadHandler(CefManager* manager, BrowserInstance* browser)
-        : manager_(manager), browser_(browser)
-    {
-    }
-
-    void OnLoadEnd(
-        CefRefPtr<CefBrowser> browser,
-        CefRefPtr<CefFrame> frame,
-        int httpStatusCode) override
-    {
-        if (frame->IsMain())
-        {
-            DEBUG_LOG_CEF("Page loaded (HTTP %d)", httpStatusCode);
-            browser_->page_loaded = TRUE;
-            manager_->on_browser_load_end(browser_, httpStatusCode);
-        }
-    }
-
-    void OnLoadError(
-        CefRefPtr<CefBrowser> browser,
-        CefRefPtr<CefFrame> frame,
-        ErrorCode errorCode,
-        const CefString& errorText,
-        const CefString& failedUrl) override
-    {
-        if (frame->IsMain())
-        {
-            manager_->on_browser_load_error(
-                browser_,
-                errorCode,
-                errorText.ToString(),
-                failedUrl.ToString()
-            );
-        }
-    }
-
-private:
-    CefManager* manager_;
-    BrowserInstance* browser_;
-    IMPLEMENT_REFCOUNTING(CefManagerLoadHandler);
-};
-
-/**
- * CefManagerLifeSpanHandler - Handles browser lifecycle events
- */
-class CefManagerLifeSpanHandler : public CefLifeSpanHandler
-{
-public:
-    CefManagerLifeSpanHandler(CefManager* manager, BrowserInstance* browser)
-        : manager_(manager), browser_(browser)
-    {
-    }
-
-    void OnAfterCreated(CefRefPtr<CefBrowser> browser) override
-    {
-        CEF_REQUIRE_UI_THREAD();
-        DEBUG_LOG_CEF("OnAfterCreated - browser=%p", browser.get());
-        manager_->on_browser_created(browser_, browser);
-    }
-
-private:
-    CefManager* manager_;
-    BrowserInstance* browser_;
-    IMPLEMENT_REFCOUNTING(CefManagerLifeSpanHandler);
-};
-
-/**
- * CefManagerClient - Main CEF client for a browser instance
- */
-class CefManagerClient : public CefClient
-{
-public:
-    CefManagerClient(
-        CefRefPtr<CefRenderHandler> render_handler,
-        CefRefPtr<CefLoadHandler> load_handler,
-        CefRefPtr<CefLifeSpanHandler> lifespan_handler)
-        : render_handler_(render_handler),
-          load_handler_(load_handler),
-          lifespan_handler_(lifespan_handler)
-    {
-    }
-
-    CefRefPtr<CefRenderHandler> GetRenderHandler() override { return render_handler_; }
-    CefRefPtr<CefLoadHandler> GetLoadHandler() override { return load_handler_; }
-    CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return lifespan_handler_; }
-
-private:
-    CefRefPtr<CefRenderHandler> render_handler_;
-    CefRefPtr<CefLoadHandler> load_handler_;
-    CefRefPtr<CefLifeSpanHandler> lifespan_handler_;
-    IMPLEMENT_REFCOUNTING(CefManagerClient);
-};
-
-// ============================================================================
 // CefManager Implementation
 // ============================================================================
 
@@ -357,13 +191,10 @@ CefManager* CefManager::get()
 
 CefManager::CefManager()
     : initialized_(FALSE),
-      running_(FALSE),
       is_gpu_disabled_(TRUE),
       gpu_user_specified_(FALSE),
       gpu_device_(-1)
 {
-    g_mutex_init(&browsers_mutex_);
-
     if (!initialize_cef())
     {
         DEBUG_LOG_CEF("CefManager initialization FAILED");
@@ -375,19 +206,6 @@ CefManager::CefManager()
 
 CefManager::~CefManager()
 {
-    // Close all browsers
-    g_mutex_lock(&browsers_mutex_);
-    for (auto& pair : browser_clients_)
-    {
-        if (pair.first && pair.first->cef_browser)
-        {
-            pair.first->cef_browser->GetHost()->CloseBrowser(TRUE);
-            pair.first->cef_browser = nullptr;
-        }
-    }
-    browser_clients_.clear();
-    g_mutex_unlock(&browsers_mutex_);
-
     // Shutdown CEF
     if (initialized_)
     {
@@ -398,8 +216,6 @@ CefManager::~CefManager()
     {
         DEBUG_LOG_CEF("Deconstructed without CEF shutdown");
     }
-
-    g_mutex_clear(&browsers_mutex_);
 }
 
 gboolean CefManager::initialize_cef()
@@ -496,34 +312,66 @@ gboolean CefManager::initialize_cef()
     g_free(cache_dir);
 
     // Find CEF resources
-    const gchar* search_paths[] = {
-        g_getenv("CHROMIUMSRC_RESOURCES_PATH") ? : "skip",
-        g_getenv("GST_PLUGIN_PATH") ? g_strdup_printf("%s/gstreamer-1.0", g_getenv("GST_PLUGIN_PATH")) : "skip",
-        home_dir ? g_strdup_printf("%s/.local/share/gstreamer-1.0/plugins", home_dir) : "skip",
-        "/usr/local/lib/gstreamer-1.0",
-        "/usr/lib/gstreamer-1.0",
-        "/usr/lib/x86_64-linux-gnu/gstreamer-1.0",
-        nullptr
-    };
+    // On macOS: resources are inside the framework bundle at plugins/
+    // On Linux: resources are at plugins/Resources/
+    std::vector<gchar*> search_paths;
+    
+    const gchar* env_resources = g_getenv("CHROMIUMSRC_RESOURCES_PATH");
+    if (env_resources) {
+        search_paths.push_back(g_strdup(env_resources));
+    }
+    
+    const gchar* gst_plugin_path = g_getenv("GST_PLUGIN_PATH");
+    if (gst_plugin_path) {
+        search_paths.push_back(g_strdup_printf("%s/gstreamer-1.0", gst_plugin_path));
+    }
+    
+    if (home_dir) {
+        // macOS: framework bundle in plugins dir
+        search_paths.push_back(g_strdup_printf("%s/.local/share/gstreamer-1.0/plugins/Chromium Embedded Framework.framework", home_dir));
+        // Linux: direct Resources folder
+        search_paths.push_back(g_strdup_printf("%s/.local/share/gstreamer-1.0/plugins", home_dir));
+    }
+    
+    search_paths.push_back(g_strdup("/usr/local/lib/gstreamer-1.0/Chromium Embedded Framework.framework"));
+    search_paths.push_back(g_strdup("/usr/local/lib/gstreamer-1.0"));
+    search_paths.push_back(g_strdup("/usr/lib/gstreamer-1.0/Chromium Embedded Framework.framework"));
+    search_paths.push_back(g_strdup("/usr/lib/gstreamer-1.0"));
+    search_paths.push_back(g_strdup("/usr/lib/x86_64-linux-gnu/gstreamer-1.0"));
+    search_paths.push_back(nullptr);
 
-    for (int i = 0; search_paths[i] != nullptr; i++)
+    for (size_t i = 0; i < search_paths.size() && search_paths[i] != nullptr; i++)
     {
-        if (g_strcmp0(search_paths[i], "skip") == 0) continue;
-
-        gchar* resources_dir = g_strdup_printf("%s/Resources", search_paths[i]);
+        gchar* base_path = search_paths[i];
+        
+        // Check if this is a framework bundle (macOS) - resources are directly inside
+        // Check if this is a regular directory (Linux) - resources are in Resources/ subdirectory
+        gchar* resources_dir = g_strdup_printf("%s/Resources", base_path);
+        
+        // If Resources/ doesn't exist, check if base_path itself contains icudtl.dat (framework case)
+        if (!g_file_test(resources_dir, G_FILE_TEST_IS_DIR)) {
+            g_free(resources_dir);
+            resources_dir = g_strdup(base_path);
+        }
+        
         if (g_file_test(resources_dir, G_FILE_TEST_IS_DIR))
         {
             gchar* icu_file = g_strdup_printf("%s/icudtl.dat", resources_dir);
             if (g_file_test(icu_file, G_FILE_TEST_EXISTS))
             {
                 CefString(&settings.resources_dir_path) = resources_dir;
+                DEBUG_LOG_CEF("Found CEF resources at: %s", resources_dir);
                 g_free(icu_file);
-                g_free(resources_dir);
+                // Free remaining paths
+                for (size_t j = i + 1; j < search_paths.size() && search_paths[j] != nullptr; j++) {
+                    g_free(search_paths[j]);
+                }
                 break;
             }
             g_free(icu_file);
         }
         g_free(resources_dir);
+        g_free(base_path);
     }
 
     // Initialize CEF
@@ -537,147 +385,12 @@ gboolean CefManager::initialize_cef()
     return TRUE;
 }
 
-BrowserInstance* CefManager::create_browser(
-    const gchar* url,
-    gint width,
-    gint height,
-    gint fps,
-    BrowserCallbacks* callbacks)
-{
-    if (!initialized_)
-    {
-        DEBUG_LOG_CEF("create_browser - CEF not initialized");
-        return nullptr;
-    }
-
-    // Create browser instance
-    const auto browser = new BrowserInstance();
-    browser->width = width;
-    browser->height = height;
-    browser->fps = fps;
-    browser->page_loaded = FALSE;
-    browser->running = TRUE;
-    browser->callbacks = *callbacks;
-
-    // Create handlers
-    const auto render_handler = new CefManagerRenderHandler(this, browser, width, height);
-    const auto load_handler = new CefManagerLoadHandler(this, browser);
-    const auto lifespan_handler = new CefManagerLifeSpanHandler(this, browser);
-
-    // Create client
-    const auto client = new CefManagerClient(render_handler, load_handler, lifespan_handler);
-
-    // Track browser
-    g_mutex_lock(&browsers_mutex_);
-    browser_clients_[browser] = client;
-    g_mutex_unlock(&browsers_mutex_);
-
-    // Configure windowless rendering
-    CefWindowInfo window_info;
-    window_info.SetAsWindowless(0);
-
-    // Configure browser settings
-    CefBrowserSettings browser_settings;
-    browser_settings.windowless_frame_rate = fps;
-
-    CefString cef_url(url);
-
-    DEBUG_LOG_CEF("CreateBrowser - url=%s, width=%d, height=%d, fps=%d", url, width, height, fps);
-
-    // Create browser asynchronously
-    if (!CefBrowserHost::CreateBrowser(
-        window_info, client, cef_url, browser_settings, nullptr, nullptr))
-    {
-        DEBUG_LOG_CEF("CreateBrowser FAILED");
-        g_mutex_lock(&browsers_mutex_);
-        browser_clients_.erase(browser);
-        g_mutex_unlock(&browsers_mutex_);
-        delete browser;
-        return nullptr;
-    }
-
-    DEBUG_LOG_CEF("Browser creation initiated");
-    return browser;
-}
-
-void CefManager::destroy_browser(BrowserInstance* browser)
-{
-    if (!browser) return;
-
-    DEBUG_LOG_CEF("Destroying browser...");
-
-    browser->running = FALSE;
-
-    // Remove from tracking
-    g_mutex_lock(&browsers_mutex_);
-    browser_clients_.erase(browser);
-    g_mutex_unlock(&browsers_mutex_);
-
-    // Close CEF browser
-    if (browser->cef_browser)
-    {
-        browser->cef_browser->GetHost()->CloseBrowser(TRUE);
-        browser->cef_browser = nullptr;
-    }
-
-    delete browser;
-    DEBUG_LOG_CEF("Browser destroyed");
-}
-
-CefBrowser* CefManager::get_browser_handle(BrowserInstance* browser)
-{
-    return browser ? browser->cef_browser.get() : nullptr;
-}
-
-gboolean CefManager::is_page_loaded(BrowserInstance* browser)
-{
-    return browser ? browser->page_loaded : FALSE;
-}
-
-void CefManager::on_browser_created(BrowserInstance* browser, CefRefPtr<CefBrowser> cef_browser)
-{
-    if (browser)
-    {
-        browser->cef_browser = cef_browser;
-        DEBUG_LOG_CEF("Browser created and stored");
-    }
-}
-
-void CefManager::on_browser_paint(
-    BrowserInstance* browser,
-    const void* buffer,
-    int width,
-    int height)
-{
-    if (browser && browser->callbacks.on_paint)
-    {
-        browser->callbacks.on_paint(browser->callbacks.user_data, buffer, width, height);
-    }
-}
-
-void CefManager::on_browser_load_end(BrowserInstance* browser, int http_status_code)
-{
-    if (browser && browser->callbacks.on_load_end)
-    {
-        browser->callbacks.on_load_end(browser->callbacks.user_data, http_status_code);
-    }
-}
-
-void CefManager::on_browser_load_error(
-    BrowserInstance* browser,
-    int error_code,
-    const std::string& error_text,
-    const std::string& failed_url)
-{
-    DEBUG_LOG_CEF("Load error: %s (%d) - %s",
-                  error_text.c_str(), error_code, failed_url.c_str());
-}
-
 // ============================================================================
 // C API wrapper functions
 // ============================================================================
 
 extern "C" {
+
 void cef_manager_configure(gboolean disable_gpu, gboolean gpu_user_specified)
 {
     CefManager::configure(disable_gpu, gpu_user_specified);
@@ -688,31 +401,16 @@ gpointer cef_manager_get(void)
     return CefManager::get();
 }
 
-BrowserInstance* cef_manager_create_browser(
-    gpointer manager,
-    const gchar* url,
-    gint width,
-    gint height,
-    gint fps,
-    BrowserCallbacks* callbacks)
+gboolean cef_manager_is_gpu_disabled(void)
 {
-    CefManager* m = static_cast<CefManager*>(manager);
-    return m ? m->create_browser(url, width, height, fps, callbacks) : nullptr;
+    CefManager* manager = CefManager::get();
+    return manager ? manager->is_gpu_disabled() : TRUE;
 }
 
-void cef_manager_destroy_browser(gpointer manager, BrowserInstance* browser)
+gint cef_manager_get_gpu_device(void)
 {
-    CefManager* m = static_cast<CefManager*>(manager);
-    if (m) m->destroy_browser(browser);
+    CefManager* manager = CefManager::get();
+    return manager ? manager->get_gpu_device() : -1;
 }
 
-gpointer cef_manager_get_browser_handle(BrowserInstance* browser)
-{
-    return browser ? browser->cef_browser.get() : nullptr;
-}
-
-gboolean cef_manager_is_page_loaded(BrowserInstance* browser)
-{
-    return CefManager::get() ? CefManager::get()->is_page_loaded(browser) : FALSE;
-}
 }
