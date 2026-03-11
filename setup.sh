@@ -8,7 +8,7 @@ set -e
 #CEF_VERSION="121.3.15%2Bg4d3b0b4%2Bchromium-121.0.6167.184"
 CEF_VERSION="145.0.28%2Bg51162e8%2Bchromium-145.0.7632.160"
 CEF_DIR="third_party/cef"
-BUILD_DIR="build_cef_wrapper"
+BUILD_DIR="third_party/build_cef_wrapper"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 cd "$SCRIPT_DIR"
@@ -117,17 +117,28 @@ install_linux_deps() {
     
     if check_command "apt-get"; then
         sudo apt-get update
-        sudo apt-get install -y cmake curl build-essential pkg-config \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-            libgstreamer-plugins-good1.0-dev libgstreamer-plugins-bad1.0-dev \
-            libglib2.0-dev
+        sudo apt-get install -y cmake curl build-essential pkg-config libglib2.0-dev
+        sudo apt-get install -y \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+            gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl \
+            gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio
+
+        # Chromium dependencies:
+        sudo apt-get install -y libdbus-1-dev libcups2-dev libnss3-dev libnspr4-dev \
+            libasound2-dev libatk1.0-dev libatk-bridge2.0-dev libatspi2.0-dev \
+            libpango1.0-dev libxkbcommon-dev libxcomposite-dev libxdamage-dev \
+            libxfixes-dev libxrandr-dev libx11-dev libxext-dev libdrm-dev
+
     elif check_command "dnf"; then
         sudo dnf install -y cmake curl gcc-c++ make pkgconfig \
             gstreamer1-devel gstreamer1-plugins-base-devel \
             glib2-devel
+
     elif check_command "pacman"; then
         sudo pacman -S --noconfirm cmake curl base-devel pkg-config \
             gstreamer gst-plugins-base gst-plugins-good glib2
+
     else
         echo "Unsupported package manager. Please install dependencies manually:"
         echo "  - cmake, curl, make, gcc/g++, pkg-config"
@@ -200,34 +211,30 @@ download_cef() {
 
 build_wrapper() {
     if [ -f "$BUILD_DIR/libcef_dll_wrapper/libcef_dll_wrapper.a" ]; then
-        echo "CEF wrapper already built at $BUILD_DIR/libcef_dll_wrapper/libcef_dll_wrapper.a"
-        read -p "Rebuild? [y/N] " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            return 0
-        fi
+        rm -f "$BUILD_DIR/libcef_dll_wrapper/libcef_dll_wrapper.a"
     fi
-    
+
     echo "Building CEF wrapper..."
-    
+
     rm -rf "$BUILD_DIR"
     mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
-    
-    cmake ../third_party/cef -DCMAKE_BUILD_TYPE=Release
-    
+
+    # Build wrapper into this directory
+    cmake ../cef -DCMAKE_BUILD_TYPE=Release
+
     if [ "$(uname -s)" = "Darwin" ]; then
         NPROC=$(sysctl -n hw.ncpu)
     else
         NPROC=$(nproc)
     fi
-    
+
     make libcef_dll_wrapper -j"$NPROC"
 
     # Move file to cef/Release dir
-    mkdir -p ../third_party/cef/Release
-    rm -f ../third_party/cef/Release/libcef_dll_wrapper.a
-    cp libcef_dll_wrapper/libcef_dll_wrapper.a ../third_party/cef/Release/
+    mkdir -p ../cef/Release
+    rm -f ../cef/Release/libcef_dll_wrapper.a
+    cp libcef_dll_wrapper/libcef_dll_wrapper.a ../cef/Release/
 
     cd "$SCRIPT_DIR"
     

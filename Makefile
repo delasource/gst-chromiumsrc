@@ -13,7 +13,7 @@
 # CEF Configuration
 CEF_DIR = third_party/cef
 CEF_LIB_DIR = $(CEF_DIR)/Release
-CEF_WRAPPER = build_cef_wrapper/libcef_dll_wrapper/libcef_dll_wrapper.a
+CEF_WRAPPER = third_party/build_cef_wrapper/libcef_dll_wrapper/libcef_dll_wrapper.a
 
 UNAME_S := $(shell uname -s)
 
