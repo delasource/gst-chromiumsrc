@@ -55,6 +55,13 @@ pkg_check_modules(GST REQUIRED
 )
 pkg_check_modules(GLIB REQUIRED glib-2.0)
 
+# CEF dependencies on Linux
+if(OS_LINUX)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(DBUS dbus-1)
+  pkg_check_modules(CUPS cups)
+endif()
+
 # Common compile definitions
 set(COMMON_DEFINES
   PACKAGE="chromiumsrc"
@@ -119,12 +126,19 @@ if(OS_MAC)
     BUILD_WITH_INSTALL_RPATH TRUE
   )
 elseif(OS_LINUX)
-  target_link_libraries(gstchromiumsrc PRIVATE
+  set(LINUX_LIBS
     ${CEF_WRAPPER_LIB}
     ${CEF_LIB}
     ${GST_LIBRARIES}
     ${GLIB_LIBRARIES}
   )
+  if(DBUS_FOUND)
+    list(APPEND LINUX_LIBS ${DBUS_LIBRARIES})
+  endif()
+  if(CUPS_FOUND)
+    list(APPEND LINUX_LIBS ${CUPS_LIBRARIES})
+  endif()
+  target_link_libraries(gstchromiumsrc PRIVATE ${LINUX_LIBS})
   
   # Set RPATH for finding libcef.so relative to plugin
   set_target_properties(gstchromiumsrc PROPERTIES
@@ -179,11 +193,18 @@ if(OS_MAC)
     BUILD_WITH_INSTALL_RPATH TRUE
   )
 elseif(OS_LINUX)
-  target_link_libraries(chromiumsrc-subprocess PRIVATE
+  set(SUBPROCESS_LIBS
     ${CEF_WRAPPER_LIB}
     ${CEF_LIB}
     ${GLIB_LIBRARIES}
   )
+  if(DBUS_FOUND)
+    list(APPEND SUBPROCESS_LIBS ${DBUS_LIBRARIES})
+  endif()
+  if(CUPS_FOUND)
+    list(APPEND SUBPROCESS_LIBS ${CUPS_LIBRARIES})
+  endif()
+  target_link_libraries(chromiumsrc-subprocess PRIVATE ${SUBPROCESS_LIBS})
   
   set_target_properties(chromiumsrc-subprocess PROPERTIES
     INSTALL_RPATH "$ORIGIN"

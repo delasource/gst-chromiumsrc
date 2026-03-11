@@ -1,4 +1,4 @@
 #!/bin/bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+cmake -B build -DCMAKE_BUILD_TYPE=Release || exit
+cmake --build build || exit
 cmake --install build
