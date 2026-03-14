@@ -149,6 +149,7 @@ static void gst_chromium_src_init(GstChromiumSrc *src) {
     g_object_set(src->appsrc, "stream-type", GST_APP_STREAM_TYPE_STREAM, NULL);
     g_object_set(src->appsrc, "format", GST_FORMAT_TIME, NULL);
     g_object_set(src->appsrc, "is-live", TRUE, NULL);
+    g_object_set(src->appsrc, "do-timestamp", TRUE, NULL);
     g_object_set(src->appsrc, "emit-signals", TRUE, NULL);
     g_object_set(src->appsrc, "max-bytes", (guint64)(1920 * 1080 * 4 * 3), NULL);
 
@@ -302,7 +303,6 @@ static void gst_chromium_src_need_data(GstAppSrc *appsrc, guint length,
     GstBuffer *buffer;
     GstMapInfo map;
     GstFlowReturn ret;
-    GstClockTime duration, timestamp;
 
     GST_DEBUG_OBJECT(src, "need-data: length=%u", length);
 
@@ -340,19 +340,12 @@ static void gst_chromium_src_need_data(GstAppSrc *appsrc, guint length,
     src->frame_ready = FALSE;
     g_mutex_unlock(&src->frame_mutex);
 
-    duration = gst_util_uint64_scale(GST_SECOND, 1, src->fps_num);
-    timestamp = src->frame_count * duration;
-
-    GST_BUFFER_PTS(buffer) = timestamp;
-    GST_BUFFER_DTS(buffer) = timestamp;
-    GST_BUFFER_DURATION(buffer) = duration;
+    // do-timestamp=TRUE handles timestamping automatically
+    GST_BUFFER_PTS(buffer) = GST_CLOCK_TIME_NONE;
+    GST_BUFFER_DTS(buffer) = GST_CLOCK_TIME_NONE;
+    GST_BUFFER_DURATION(buffer) = gst_util_uint64_scale(GST_SECOND, 1, src->fps_num);
 
     src->frame_count++;
-
-    GST_DEBUG_OBJECT(src,
-		"Pushing buffer: ts=%" GST_TIME_FORMAT " dur=%" GST_TIME_FORMAT,
-        GST_TIME_ARGS(timestamp),
-        GST_TIME_ARGS(duration));
 
     ret = gst_app_src_push_buffer(src->appsrc, buffer);
     if (ret != GST_FLOW_OK) {

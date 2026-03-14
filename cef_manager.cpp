@@ -85,10 +85,8 @@ public:
 
         if (!is_gpu_disabled_)
         {
-            // GPU acceleration mode
-            command_line->AppendSwitchWithValue("use-gl", "egl-angle");
-            command_line->AppendSwitchWithValue("use-angle", "egl");
-            // command_line->AppendSwitch("enable-gpu-rasterization");
+            // GPU acceleration mode - let Chromium auto-detect best GL implementation
+            // Don't force specific GL/ANGLE backends as they may not work on all systems
             command_line->AppendSwitch("enable-zero-copy");
             command_line->AppendSwitch("ignore-gpu-blocklist");
 
@@ -143,10 +141,7 @@ public:
 
         if (!is_gpu_disabled_)
         {
-            // DEBUG_LOG_GL("BeforeChildProcessLaunch - GPU enabled, using egl-angle");
-            command_line->AppendSwitchWithValue("use-gl", "egl-angle");
-            command_line->AppendSwitchWithValue("use-angle", "egl");
-            // command_line->AppendSwitch("enable-gpu-rasterization");
+            // GPU enabled - let Chromium auto-detect best GL implementation
             command_line->AppendSwitch("ignore-gpu-blocklist");
 
             if (!has_display)
