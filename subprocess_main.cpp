@@ -103,9 +103,15 @@ public:
             command_line->AppendSwitchWithValue("ozone-platform", "headless");
             // Enable new headless mode (Chrome's modern headless implementation)
             command_line->AppendSwitchWithValue("headless", "new");
+
+            // Vulkan ANGLE backend for headless GPU (matches browser process flags)
+            command_line->AppendSwitchWithValue("use-angle", "vulkan");
+            command_line->AppendSwitchWithValue("enable-features", "Vulkan");
+            command_line->AppendSwitch("disable-vulkan-surface");
         }
 
-        // g_print("[%s] Final command line: %s\n", process_type_.c_str(), command_line->GetCommandLineString().ToString().c_str());
+        g_print("[%s] Final command line: %s\n", process_type_.c_str(),
+                command_line->GetCommandLineString().ToString().c_str());
     }
 
     IMPLEMENT_REFCOUNTING(CefSubprocessApp);

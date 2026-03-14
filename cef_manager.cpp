@@ -92,11 +92,19 @@ public:
 
             if (!has_display)
             {
-                DEBUG_LOG_GL("OnBeforeCommandLineProcessing - NO DISPLAY, using headless");
+                DEBUG_LOG_GL("OnBeforeCommandLineProcessing - NO DISPLAY, using headless + Vulkan ANGLE");
                 command_line->AppendSwitchWithValue("ozone-platform", "headless");
                 command_line->AppendSwitchWithValue("headless", "new");
+
+                // Force Vulkan backend for ANGLE - bypasses EGL's X11 dependency.
+                // Without this, ANGLE tries EGL → X11 → "Could not open the default X display"
+                // See: chromium.googlesource.com/chromium/src/+/HEAD/docs/gpu/using-gpu-hardware-in-headless-chrome.md
+                command_line->AppendSwitchWithValue("use-angle", "vulkan");
+                command_line->AppendSwitchWithValue("enable-features", "Vulkan");
+                command_line->AppendSwitch("disable-vulkan-surface");
             }
-            DEBUG_LOG_GL("OnBeforeCommandLineProcessing - GPU mode enabled");
+            DEBUG_LOG_GL("OnBeforeCommandLineProcessing - GPU mode enabled (display=%s)",
+                         has_display ? "yes" : "no");
         }
         else
         {
@@ -113,7 +121,8 @@ public:
             DEBUG_LOG_GL("OnBeforeCommandLineProcessing - SwiftShader software rendering");
         }
 
-        //DEBUG_LOG_GL("NOARGS!");
+        DEBUG_LOG_GL("OnBeforeCommandLineProcessing - final cmdline: %s",
+                     command_line->GetCommandLineString().ToString().c_str());
     }
 
     CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override
@@ -148,6 +157,11 @@ public:
             {
                 command_line->AppendSwitchWithValue("ozone-platform", "headless");
                 command_line->AppendSwitchWithValue("headless", "new");
+
+                // Vulkan ANGLE backend for headless GPU (same as browser process)
+                command_line->AppendSwitchWithValue("use-angle", "vulkan");
+                command_line->AppendSwitchWithValue("enable-features", "Vulkan");
+                command_line->AppendSwitch("disable-vulkan-surface");
             }
         }
         else
@@ -163,7 +177,10 @@ public:
             }
         }
 
-        // DEBUG_LOG_GL("OnBeforeChildProcessLaunch - %s", command_line->GetCommandLineString().ToString().c_str());
+        DEBUG_LOG_GL("OnBeforeChildProcessLaunch - gpu=%s, display=%s, cmdline: %s",
+                     is_gpu_disabled_ ? "off" : "on",
+                     has_display ? "yes" : "no",
+                     command_line->GetCommandLineString().ToString().c_str());
     }
 
 private:
@@ -428,9 +445,14 @@ gboolean CefManager::initialize_cef()
 
     DEBUG_LOG_CEF("GPU config: disabled=%d, device=%d", is_gpu_disabled_, gpu_device_);
 
-    // Log environment
-    // DEBUG_LOG_CEF("=== Environment Variables ===");
-    // DEBUG_LOG_CEF("XDG_RUNTIME_DIR: %s", g_getenv("XDG_RUNTIME_DIR") ?: "(not set)");
+    // Log environment for debugging headless/GPU issues
+    const gchar* display_env = g_getenv("DISPLAY");
+    const gchar* wayland_env = g_getenv("WAYLAND_DISPLAY");
+    const gchar* xdg_rt = g_getenv("XDG_RUNTIME_DIR");
+    DEBUG_LOG_CEF("Environment: DISPLAY=%s, WAYLAND_DISPLAY=%s, XDG_RUNTIME_DIR=%s",
+                  display_env ? display_env : "(not set)",
+                  wayland_env ? wayland_env : "(not set)",
+                  xdg_rt ? xdg_rt : "(not set)");
     // DEBUG_LOG_CEF("DBUS_SESSION_BUS_ADDRESS: %s", g_getenv("DBUS_SESSION_BUS_ADDRESS") ?: "(not set)");
     // DEBUG_LOG_CEF("HOME: %s", g_getenv("HOME") ?: "(not set)");
     // DEBUG_LOG_CEF("XAUTHORITY: %s", g_getenv("XAUTHORITY") ?: "(not set)");
