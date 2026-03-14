@@ -20,9 +20,9 @@ make install
 
 # Using compositor and GPU AUTO
 timeout 6 \
-gst-launch-1.0 compositor name=comp ! videoconvert ! autovideosink \
+gst-launch-1.0 compositor name=comp ! videoconvert ! fakesink \
   videotestsrc ! video/x-raw,format=RGBA,width=1920,height=1080 ! queue ! comp. \
-  chromiumsrc url="https://png.ninja/png-test.html" ! videoconvert ! video/x-raw,format=RGBA ! videoscale ! video/x-raw,width=1920,height=1080 ! queue ! comp.
+  chromiumsrc url="https://png.ninja/png-test.html" ! videoconvert ! video/x-raw,format=RGBA,width=1920,height=1080 ! queue ! comp.
 
 # Using glvideomixer
 #timeout 6 \
