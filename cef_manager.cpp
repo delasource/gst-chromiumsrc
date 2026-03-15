@@ -516,6 +516,10 @@ gboolean CefManager::initialize_cef()
     CefString(&settings.cache_path) = cache_dir;
     g_free(cache_dir);
 
+    // Disable signal handlers on POSIX systems to prevent conflicts with .NET managed debugger
+    // See: https://github.com/chromiumembedded/cef/pull/3751
+    settings.disable_signal_handlers = true;
+
     // Find CEF resources
     const gchar* search_paths[] = {
         g_getenv("CHROMIUMSRC_RESOURCES_PATH") ? : "skip",
