@@ -93,8 +93,8 @@ public:
         // command_line->AppendSwitch("no-sandbox");
         // Disable field trial experiments for deterministic behavior
         // command_line->AppendSwitch("disable-field-trial-config");
-        // Enable verbose logging for debugging
-        command_line->AppendSwitchWithValue("log-severity", "verbose");
+        // Log severity: verbose, info, warning, error, fatal, disable
+        command_line->AppendSwitchWithValue("log-severity", "info");
 
         if (!has_display)
         {

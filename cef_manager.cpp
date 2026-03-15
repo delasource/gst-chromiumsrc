@@ -79,6 +79,10 @@ public:
         // command_line->AppendSwitch("no-sandbox");
         command_line->AppendSwitch("disable-field-trial-config");
 
+        // Prevent Chrome from downloading component updates (CRX extensions)
+        // — eliminates update.googleapis.com network noise and unzipper subprocesses
+        command_line->AppendSwitch("disable-component-update");
+
         // Check for display
         const gchar* display = g_getenv("DISPLAY");
         gboolean has_display = display != nullptr && g_strcmp0(display, "NULL") != 0 && strlen(display) > 0;
